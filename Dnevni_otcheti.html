@@ -7,7 +7,8 @@
     <!-- Връзките към шрифтовете се отварят веднага; модулът за снимки е нужен чак при сваляне, затова не спира показването (defer) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <script defer src="https://cdn.jsdelivr.net/npm/html2canvas-pro@2.0.2/dist/html2canvas-pro.min.js"></script>
+    <!-- Библиотеката за снимките се ползва само при сваляне на отчет - зарежда се на заден план и не задържа отварянето -->
+    <script async src="https://cdn.jsdelivr.net/npm/html2canvas-pro@2.0.2/dist/html2canvas-pro.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;700;800&family=Lato:wght@400;700;900&family=Merriweather:wght@400;700;900&family=Montserrat:wght@400;700;900&family=Open+Sans:wght@400;700;800&family=Oswald:wght@400;700&family=Playfair+Display:wght@400;700;900&family=Poppins:wght@400;700;900&family=Roboto:wght@400;700;900&family=Ubuntu:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body { background-image: radial-gradient(#e5e7eb 1px, transparent 1px); background-size: 24px 24px; }
@@ -642,6 +643,20 @@
             #warningModal .wm-ico.wm-ico-img, html.dark #warningModal .wm-ico.wm-ico-img { width: 2.9rem; height: 2.9rem; }
             #warningProceedBtn { height: 3.8rem; }
         }
+        /* v3.92 - по-леко: без размазване (backdrop-filter). Размазването на целия екран и на картата се изчисляваше наново
+           на всеки кадър и прозорецът се насичаше; фонът е почти непрозрачен, затова видът остава същият */
+        #warningModal > div:first-child, #warningModal .wm-card, html.dark #warningModal .wm-card, #warningModal .wm-glass {
+            -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+        #warningModal > div:first-child {
+            background:
+                radial-gradient(22rem 22rem at 80% 30%, rgba(45,140,160,.2), transparent 70%),
+                radial-gradient(18rem 18rem at 12% 72%, rgba(251,146,60,.09), transparent 70%),
+                radial-gradient(90% 75% at 50% 38%, rgba(14,46,60,.9) 0%, rgba(3,12,20,.97) 100%) !important;
+        }
+        /* Докато прозорецът е отворен, началният екран отзад спира анимациите си (и без това почти не се вижда) */
+        html.wm-open #welcomeScreen *, html.wm-open #welcomeScreen *::before, html.wm-open #welcomeScreen *::after { animation-play-state: paused !important; }
+        /* ...а надписите и офисите отзад се скриват, за да не прозират през картата (преди ги скриваше размазването) */
+        html.wm-open #welcomeScreen .hz-stage, html.wm-open #welcomeScreen .cb-welcome, html.wm-open #welcomeScreen .hz-ver { visibility: hidden; }
 
         /* ===== Системен тест (диагностика) ===== */
         #sysTestModal .st-card {
@@ -741,6 +756,8 @@
         @keyframes hz-au2 { to { transform: translate(-16vw, 14vw) scale(.9); } }
         .hz-vign { position: absolute; inset: 0; background: radial-gradient(120% 100% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%); }
         .hz-stars { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+        img.hz-stars { bottom: auto; height: 80%; max-width: none; user-select: none; }
+        @keyframes hz-tw { from { opacity: .12; } to { opacity: 1; } }
         .hz-shoot { position: absolute; left: 0; top: 0; height: 2px; margin-top: -1px; border-radius: 2px; z-index: 0; pointer-events: none; opacity: 0;
             transform-origin: 100% 50%; background: linear-gradient(90deg, rgba(255,255,255,0), #fff); }
         /* Планетата и ореолът ѝ - само градиенти (без огромни размазани сенки) */
@@ -3817,7 +3834,7 @@
 
     <!-- ДОБАВЕНО: Предупредителен Модал преди влизане (10 секунди) -->
         <div id="warningModal" class="fixed inset-0 z-[300] hidden flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity"></div>
+        <div class="absolute inset-0 bg-black/80 transition-opacity"></div>
         <div class="wm-card" role="alertdialog" aria-modal="true" aria-labelledby="wmTitle">
             <div class="wm-orb" aria-hidden="true">
                 <span class="wm-ring"></span><span class="wm-ring r2"></span>
@@ -3968,10 +3985,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '3.91',
+        version: '3.92',
         date: '28.10.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '3.92', date: '28.10.2026', notes: [
+                'По-бързо и по-гладко: „Спри за момент!“ вече не насича (без тежкото размазване на фона), а звездното небе на началния екран не натоварва компютъра'
+            ] },
             { version: '3.91', date: '28.10.2026', notes: [
                 '„Оборот за деня“: по-голямо 3D лого на Western Union (същото като в касите) с надпис „Парични преводи“, подравнено с реда „Премии“'
             ] },
@@ -4146,12 +4166,23 @@
     'use strict';
     const canvas = document.getElementById('particlesCanvas');
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
     const reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     const motion = reduceMotion ? 0.35 : 1;     // при изключени анимации в Windows - по-бавно и по-рядко
     const TAU = Math.PI * 2;
     const shootEl = document.getElementById('welcomeShoot');
-    let stars = [], cssW = 0, cssH = 0, rafId = 0, t0 = 0, lastDraw = 0, shootTimer = 0;
+    // Звездите се рисуват веднъж в няколко неподвижни картинки, а примигването е бавна смяна на прозрачността им
+    // (CSS анимация, която прави видеокартата). Преди звездите бяха в canvas, който се прерисуваше ~30 пъти в секунда
+    // и се изпращаше към екрана на всеки кадър - това натоварваше началния екран (особено на екрани с мащаб над 100%).
+    const TWINKLE = [[2.9, -1.1], [4.7, -3.3], [7.3, -5.2]];   // [полупериод, начало] в секунди
+    canvas.hidden = true;
+    const layers = TWINKLE.map(function (tw) {
+        const img = document.createElement('img');
+        img.className = canvas.className; img.alt = ''; img.setAttribute('aria-hidden', 'true'); img.decoding = 'async';
+        img.style.animation = 'hz-tw ' + (tw[0] / motion).toFixed(2) + 's ease-in-out ' + (tw[1] / motion).toFixed(2) + 's infinite alternate';
+        return img;
+    });
+    canvas.after.apply(canvas, layers);
+    let cssW = 0, cssH = 0, shootTimer = 0, fitGen = 0;
     window.animationFrameId = 0;   // старият код (confirmOfficeChange) извиква cancelAnimationFrame(animationFrameId)
 
     function welcomeGone() {
@@ -4160,37 +4191,38 @@
         return !s || s.style.display === 'none' || window.welcomeLeaving === true;
     }
     function fit() {
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2), gen = ++fitGen;
         cssW = window.innerWidth; cssH = window.innerHeight;
-        canvas.width = Math.round(cssW * dpr); canvas.height = Math.round(cssH * dpr);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const ctxs = layers.map(function () {
+            const c = document.createElement('canvas');
+            c.width = Math.round(cssW * dpr); c.height = Math.round(cssH * 0.8 * dpr);   // звездите са само в горните 80%
+            const x = c.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); return x;
+        });
         const n = Math.max(120, Math.min(480, Math.round((cssW * cssH) / 4000)));
-        stars = Array.from({ length: n }, function () {
-            return { x: Math.random(), y: Math.random() * 0.8, r: 0.4 + Math.random() * 1.3, a: 0.25 + Math.random() * 0.7, s: 0.5 + Math.random() * 2, p: Math.random() * TAU, gold: Math.random() < 0.15 };
+        for (let i = 0; i < n; i++) {
+            const ctx = ctxs[Math.floor(Math.random() * ctxs.length)];
+            ctx.globalAlpha = 0.25 + Math.random() * 0.7;
+            ctx.fillStyle = Math.random() < 0.15 ? '#fde68a' : '#ccfbf1';
+            ctx.beginPath(); ctx.arc(Math.random() * cssW, Math.random() * 0.8 * cssH, 0.4 + Math.random() * 1.3, 0, TAU); ctx.fill();
+        }
+        ctxs.forEach(function (ctx, k) {
+            ctx.canvas.toBlob(function (blob) {
+                if (!blob || gen !== fitGen) return;
+                const img = layers[k], old = img.src;
+                img.src = URL.createObjectURL(blob);
+                if (old && old.indexOf('blob:') === 0) setTimeout(function () { URL.revokeObjectURL(old); }, 1000);
+            });
         });
     }
     let resizeTimer = 0;
     window.addEventListener('resize', function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(fit, 140); });
 
-    function drawStars(t) {
-        // две групи цветове -> fillStyle се сменя само два пъти на кадър, яркостта е с globalAlpha
-        for (let g = 0; g < 2; g++) {
-            ctx.fillStyle = g ? '#fde68a' : '#ccfbf1';
-            for (let i = 0; i < stars.length; i++) {
-                const o = stars[i];
-                if (o.gold !== !!g) continue;
-                ctx.globalAlpha = o.a * (0.55 + 0.45 * Math.sin(t / 1000 * o.s * motion + o.p));
-                ctx.beginPath(); ctx.arc(o.x * cssW, o.y * cssH, o.r, 0, TAU); ctx.fill();
-            }
-        }
-        ctx.globalAlpha = 1;
-    }
     // Падащата звезда е отделен елемент, който се движи изцяло от видеокартата (transform + opacity):
     // остава гладка, дори когато в същия момент се щракне върху офис или приложението има друга работа
     function planShoot(ms) { clearTimeout(shootTimer); shootTimer = setTimeout(fireShoot, ms); }
     function fireShoot() {
         if (welcomeGone() || !shootEl || !shootEl.animate) return;     // планира се наново при animateParticles()
-        if (document.hidden) { planShoot(2000); return; }
+        if (document.hidden || document.documentElement.classList.contains('wm-open')) { planShoot(2000); return; }
         const len = 160 + Math.random() * 120, ang = 0.45 + Math.random() * 0.25;
         const x0 = Math.random() * cssW * 0.7 + cssW * 0.05, y0 = Math.random() * cssH * 0.3;
         const x1 = x0 + Math.cos(ang) * 520, y1 = y0 + Math.sin(ang) * 520, deg = (ang * 180 / Math.PI).toFixed(2);
@@ -4201,30 +4233,14 @@
         ], { duration: 900, easing: 'linear' });
         planShoot(900 + (2800 + Math.random() * 3500) / motion);
     }
-    function schedule() { rafId = requestAnimationFrame(loop); window.animationFrameId = rafId; }
-    function loop(now) {
-        if (welcomeGone()) { rafId = 0; window.animationFrameId = 0; return; }
-        schedule();
-        if (typeof now !== 'number') now = performance.now();
-        if (!t0) t0 = now;
-        // примигването е бавно - ~30 кадъра в секунда са напълно достатъчни (половината работа)
-        if (now - lastDraw < 30) return;
-        lastDraw = now;
-        ctx.clearRect(0, 0, cssW, cssH);
-        drawStars(now - t0);
-    }
-    // Публичен вход (както преди): стартира цикъла наново, без да се дублират кадри
+    // Публичен вход (както преди): рисува небето наново и пуска падащите звезди
     function animateParticles() {
-        if (rafId) cancelAnimationFrame(rafId);
-        rafId = 0; t0 = 0; lastDraw = 0;
         fit();
-        schedule();
         planShoot(1200);
     }
     window.initParticles = fit;
     window.animateParticles = animateParticles;
     fit();
-    schedule();
     planShoot(1200);
 })();
     </script>
@@ -7661,6 +7677,7 @@
             
             // Показваме модала
             modal.classList.remove('hidden');
+            document.documentElement.classList.add('wm-open');
             let timeLeft = 3;
             
             // Настройваме бутона като заключен
@@ -7688,7 +7705,7 @@
                         btn.onclick = null;
                         proceedToApp(true);
                         modal.classList.add('wm-leaving');
-                        setTimeout(() => { modal.classList.add('hidden'); modal.classList.remove('wm-leaving'); }, 460);
+                        setTimeout(() => { modal.classList.add('hidden'); modal.classList.remove('wm-leaving'); document.documentElement.classList.remove('wm-open'); }, 460);
                     };
                 }
             }, 1000);
@@ -7956,10 +7973,12 @@
             }
         });
 
-        window.onload = function() {
+        // Началният екран се попълва веднага щом страницата е прочетена - не чака шрифтовете и библиотеките от интернет
+        function bootApp() {
             initWelcomeScreen();
             calculate(); // Правим първоначална калкулация, за да изглежда добре приложението отзад
-        };
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootApp); else bootApp();
 
     </script>
 </body>
