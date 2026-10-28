@@ -757,6 +757,7 @@
         .hz-vign { position: absolute; inset: 0; background: radial-gradient(120% 100% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%); }
         .hz-stars { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
         img.hz-stars { bottom: auto; height: 80%; max-width: none; user-select: none; }
+        img.hz-stars:not(.is-ready) { visibility: hidden; }
         @keyframes hz-tw { from { opacity: .12; } to { opacity: 1; } }
         .hz-shoot { position: absolute; left: 0; top: 0; height: 2px; margin-top: -1px; border-radius: 2px; z-index: 0; pointer-events: none; opacity: 0;
             transform-origin: 100% 50%; background: linear-gradient(90deg, rgba(255,255,255,0), #fff); }
@@ -3985,10 +3986,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '3.92',
+        version: '3.93',
         date: '28.10.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '3.93', date: '28.10.2026', notes: [
+                'Поправено: при отваряне вече не се появява бяла линия през горната част на планетата'
+            ] },
             { version: '3.92', date: '28.10.2026', notes: [
                 'По-бързо и по-гладко: „Спри за момент!“ вече не насича (без тежкото размазване на фона), а звездното небе на началния екран не натоварва компютъра'
             ] },
@@ -4178,6 +4182,7 @@
     const layers = TWINKLE.map(function (tw) {
         const img = document.createElement('img');
         img.className = canvas.className; img.alt = ''; img.setAttribute('aria-hidden', 'true'); img.decoding = 'async';
+        img.onload = function () { img.classList.add('is-ready'); };   // докато няма картинка, браузърът рисува рамка - затова слоят е скрит
         img.style.animation = 'hz-tw ' + (tw[0] / motion).toFixed(2) + 's ease-in-out ' + (tw[1] / motion).toFixed(2) + 's infinite alternate';
         return img;
     });
