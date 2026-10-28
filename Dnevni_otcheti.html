@@ -261,6 +261,25 @@
         #calcSection .bn-step button:first-child:hover { color: #10b981; }
         #calcSection .bn-step button:last-child:hover { color: #ef4444; }
         #calcSection .bn-step svg { width: .95rem; height: .95rem; stroke-width: 3; }
+
+        /* ===== Калкулатор банкноти: лента „Общо“ - тъмнозелено стъкло със светеща рамка, златно € и златна сума ===== */
+        .bn-sum.bn-sum { background: radial-gradient(120% 140% at 50% 0%, #1b8a50 0%, #0f6a3a 45%, #0a4527 100%);
+            border: 1.5px solid #3fd28a; gap: .75rem;
+            box-shadow: 0 0 0 4px rgba(63,210,138,.14), 0 10px 26px -10px rgba(16,120,66,.75), inset 0 1px 0 rgba(255,255,255,.18), inset 0 -10px 22px -10px rgba(0,0,0,.45); }
+        .bn-sum .bn-sum-eur { font-style: normal; font-family: Inter, "Segoe UI", Roboto, sans-serif; font-size: 2.6rem; font-weight: 900; color: #e9b949; line-height: 1;
+            text-shadow: 0 -1px 0 #fff1b8, 0 1px 0 #c9922c, 0 2px 0 #a8741c, 0 3px 0 #8a5c12, 0 6px 10px rgba(0,0,0,.45); }
+        .bn-sum .bn-sum-lbl { text-transform: lowercase; letter-spacing: 0; font-size: 1.55rem; font-weight: 800; color: #f8fafc; margin-top: 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,.35); }
+        .bn-sum #bnMainTotal { color: #f6c523; font-size: 1.85rem; letter-spacing: 0; text-shadow: 0 2px 4px rgba(0,0,0,.3); }
+        .bn-sum #bnMainTotal > span { color: #f6c523; font-size: .92em; font-weight: 900; margin-left: .35em; text-shadow: inherit; }
+        @media (min-width: 768px) {
+            .bn-sum .bn-sum-eur { font-size: 3.1rem; }
+            .bn-sum .bn-sum-lbl { font-size: 1.9rem; }
+            .bn-sum #bnMainTotal { font-size: 2.15rem; }
+        }
+        .bn-sum .bn-sum-copy { opacity: 1; color: #e6c36a; background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.16), rgba(0,0,0,.18));
+            border: 1px solid rgba(255,255,255,.22); box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 4px 10px -4px rgba(0,0,0,.5); }
+        .bn-sum .bn-sum-copy:hover { color: #f6d27e; background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.24), rgba(0,0,0,.12)); }
     </style>
 
     <style id="design-refresh">
@@ -3584,10 +3603,10 @@
                     </div>
 
                     <!-- ПРОМЯНА: Изчистени твърди стилове и използване на flex items-baseline за перфектно подравняване -->
-                    <div class="mt-auto bg-gradient-to-b from-[#1c8b4c] to-[#0d502a] pl-6 md:pl-8 pr-14 md:pr-16 py-4 md:py-5 rounded-full flex items-center justify-between relative z-10 overflow-hidden shadow-inner group">
+                    <div class="bn-sum mt-auto bg-gradient-to-b from-[#1c8b4c] to-[#0d502a] pl-6 md:pl-8 pr-14 md:pr-16 py-4 md:py-5 rounded-full flex items-center justify-between relative z-10 overflow-hidden shadow-inner group">
                         <div class="flex items-center gap-2">
-                            <span class="text-white/90 text-3xl md:text-4xl font-black italic drop-shadow-sm leading-none">€</span>
-                            <span class="text-white/90 font-sans text-sm md:text-lg uppercase tracking-widest font-black drop-shadow-sm leading-none mt-1">Общо:</span>
+                            <span class="bn-sum-eur text-white/90 text-3xl md:text-4xl font-black italic drop-shadow-sm leading-none">€</span>
+                            <span class="bn-sum-lbl text-white/90 font-sans text-sm md:text-lg uppercase tracking-widest font-black drop-shadow-sm leading-none mt-1">Общо:</span>
                         </div>
                         <div class="flex items-baseline justify-end">
                             <!-- ПРОМЯНА: Променена началната стойност на 0 вместо 0,00 -->
@@ -3595,7 +3614,7 @@
                         </div>
                         
                         <!-- Бутон за копиране -->
-                        <button onclick="copyBnResult()" class="absolute right-2 md:right-3 bg-white/20 hover:bg-white/30 text-white p-2.5 rounded-full backdrop-blur-sm transition-all duration-300 shadow-sm opacity-50 group-hover:opacity-100 focus:opacity-100 active:scale-95 z-20" title="Копирай сумата">
+                        <button onclick="copyBnResult()" class="bn-sum-copy absolute right-2 md:right-3 bg-white/20 hover:bg-white/30 text-white p-2.5 rounded-full backdrop-blur-sm transition-all duration-300 shadow-sm opacity-50 group-hover:opacity-100 focus:opacity-100 active:scale-95 z-20" title="Копирай сумата">
                             <svg id="copyBnIcon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                             </svg>
@@ -3903,9 +3922,10 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '3.78',
+        version: '3.79',
         date: '28.10.2026',
         notes: [
+            'Нов вид на „Общо“ в Калкулатор Банкноти: светеща зелена рамка, златно 3D €, по-едър надпис и златна сума',
             'Ново лого на „Глобална статистика“: стъклен глобус с цветни 3D колони и стрелка нагоре',
             'Ново лого на „Дизайн на отчета“: 3D палитра с цветни капки боя',
             'Нови цветни бутони в „Дизайн на отчета“: коралов „Изненадай ме“ с 3D зарче, син „Запомни стила“ с отметка и звезда',
