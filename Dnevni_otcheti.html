@@ -1,9 +1,13 @@
 <!DOCTYPE html>
-<html lang="bg" class="welcome-cover">
+<html lang="bg" class="welcome-cover hz-booting">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Дневни Отчети</title>
+    <!-- Отварянето: фонът е тъмен още от първия миг (без светло проблясване), а началният екран се показва наведнъж,
+         когато всичко е готово (часовник, офиси, версия, звезди). Ако нещо се забави - след 4 s се показва така или иначе. -->
+    <style>html.welcome-cover, html.welcome-cover body { background-color: #030712 !important; background-image: none !important; }</style>
+    <script>setTimeout(function () { document.documentElement.classList.remove('hz-booting'); }, 4000);</script>
     <!-- Връзките към шрифтовете се отварят веднага; модулът за снимки е нужен чак при сваляне, затова не спира показването (defer) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -745,6 +749,12 @@
         /* ===== Начален екран „Хоризонт“: звездно небе, светеща планета и избор на офис ===== */
         #welcomeScreen[class*="bg-[#030712]"] { background: radial-gradient(120% 90% at 50% 0%, #0b2530 0%, #05121a 45%, #030712 100%) !important; }
         #welcomeScreen { color: #e8f1f5; -webkit-font-smoothing: antialiased; }
+        /* Докато се подготвя, началният екран е покрит с фона си и анимациите чакат - после всичко се показва наведнъж */
+        #welcomeScreen::after { content: ''; position: absolute; inset: 0; z-index: 60; pointer-events: none; opacity: 0; visibility: hidden;
+            background: radial-gradient(120% 90% at 50% 0%, #0b2530 0%, #05121a 45%, #030712 100%);
+            transition: opacity .4s ease, visibility 0s linear .4s; }
+        html.hz-booting #welcomeScreen::after { opacity: 1; visibility: visible; transition: none; }
+        html.hz-booting #welcomeScreen *, html.hz-booting #welcomeScreen *::before, html.hz-booting #welcomeScreen *::after { animation-play-state: paused !important; }
         .hz-sky { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
         /* Меките мъглявини са градиент (а не blur филтър): същият вид, но видеокартата не ги размазва наново на всеки кадър */
         .hz-au { position: absolute; border-radius: 50%; will-change: transform; }
@@ -756,8 +766,7 @@
         @keyframes hz-au2 { to { transform: translate(-16vw, 14vw) scale(.9); } }
         .hz-vign { position: absolute; inset: 0; background: radial-gradient(120% 100% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%); }
         .hz-stars { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
-        img.hz-stars { bottom: auto; height: 80%; max-width: none; user-select: none; }
-        img.hz-stars:not(.is-ready) { visibility: hidden; }
+        svg.hz-stars { overflow: hidden; }
         @keyframes hz-tw { from { opacity: .12; } to { opacity: 1; } }
         .hz-shoot { position: absolute; left: 0; top: 0; height: 2px; margin-top: -1px; border-radius: 2px; z-index: 0; pointer-events: none; opacity: 0;
             transform-origin: 100% 50%; background: linear-gradient(90deg, rgba(255,255,255,0), #fff); }
@@ -3986,10 +3995,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '3.93',
+        version: '3.94',
         date: '28.10.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '3.94', date: '28.10.2026', notes: [
+                'Началният екран се показва наведнъж: звездите, часовникът, офисите и версията се появяват заедно, а фонът е тъмен още от първия миг'
+            ] },
             { version: '3.93', date: '28.10.2026', notes: [
                 'Поправено: при отваряне вече не се появява бяла линия през горната част на планетата'
             ] },
@@ -4174,20 +4186,20 @@
     const motion = reduceMotion ? 0.35 : 1;     // при изключени анимации в Windows - по-бавно и по-рядко
     const TAU = Math.PI * 2;
     const shootEl = document.getElementById('welcomeShoot');
-    // Звездите се рисуват веднъж в няколко неподвижни картинки, а примигването е бавна смяна на прозрачността им
-    // (CSS анимация, която прави видеокартата). Преди звездите бяха в canvas, който се прерисуваше ~30 пъти в секунда
-    // и се изпращаше към екрана на всеки кадър - това натоварваше началния екран (особено на екрани с мащаб над 100%).
+    // Звездите са векторни (SVG): рисуват се веднага, заедно с целия екран, и са остри при всякакъв мащаб.
+    // Разпределени са в няколко неподвижни слоя, а примигването е бавна смяна на прозрачността им (CSS анимация,
+    // която прави видеокартата). Преди бяха в canvas, който се прерисуваше ~30 пъти в секунда и натоварваше екрана.
     const TWINKLE = [[2.9, -1.1], [4.7, -3.3], [7.3, -5.2]];   // [полупериод, начало] в секунди
+    const SVGNS = 'http://www.w3.org/2000/svg';
     canvas.hidden = true;
     const layers = TWINKLE.map(function (tw) {
-        const img = document.createElement('img');
-        img.className = canvas.className; img.alt = ''; img.setAttribute('aria-hidden', 'true'); img.decoding = 'async';
-        img.onload = function () { img.classList.add('is-ready'); };   // докато няма картинка, браузърът рисува рамка - затова слоят е скрит
-        img.style.animation = 'hz-tw ' + (tw[0] / motion).toFixed(2) + 's ease-in-out ' + (tw[1] / motion).toFixed(2) + 's infinite alternate';
-        return img;
+        const svg = document.createElementNS(SVGNS, 'svg');
+        svg.setAttribute('class', canvas.className); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('focusable', 'false');
+        svg.style.animation = 'hz-tw ' + (tw[0] / motion).toFixed(2) + 's ease-in-out ' + (tw[1] / motion).toFixed(2) + 's infinite alternate';
+        return svg;
     });
     canvas.after.apply(canvas, layers);
-    let cssW = 0, cssH = 0, shootTimer = 0, fitGen = 0;
+    let cssW = 0, cssH = 0, shootTimer = 0;
     window.animationFrameId = 0;   // старият код (confirmOfficeChange) извиква cancelAnimationFrame(animationFrameId)
 
     function welcomeGone() {
@@ -4196,28 +4208,14 @@
         return !s || s.style.display === 'none' || window.welcomeLeaving === true;
     }
     function fit() {
-        const dpr = Math.min(window.devicePixelRatio || 1, 2), gen = ++fitGen;
         cssW = window.innerWidth; cssH = window.innerHeight;
-        const ctxs = layers.map(function () {
-            const c = document.createElement('canvas');
-            c.width = Math.round(cssW * dpr); c.height = Math.round(cssH * 0.8 * dpr);   // звездите са само в горните 80%
-            const x = c.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); return x;
-        });
+        const parts = layers.map(function () { return []; });
         const n = Math.max(120, Math.min(480, Math.round((cssW * cssH) / 4000)));
         for (let i = 0; i < n; i++) {
-            const ctx = ctxs[Math.floor(Math.random() * ctxs.length)];
-            ctx.globalAlpha = 0.25 + Math.random() * 0.7;
-            ctx.fillStyle = Math.random() < 0.15 ? '#fde68a' : '#ccfbf1';
-            ctx.beginPath(); ctx.arc(Math.random() * cssW, Math.random() * 0.8 * cssH, 0.4 + Math.random() * 1.3, 0, TAU); ctx.fill();
+            parts[Math.floor(Math.random() * parts.length)].push('<circle cx="' + (Math.random() * cssW).toFixed(1) + '" cy="' + (Math.random() * 0.8 * cssH).toFixed(1) +
+                '" r="' + (0.4 + Math.random() * 1.3).toFixed(2) + '" fill="' + (Math.random() < 0.15 ? '#fde68a' : '#ccfbf1') + '" fill-opacity="' + (0.25 + Math.random() * 0.7).toFixed(2) + '"/>');
         }
-        ctxs.forEach(function (ctx, k) {
-            ctx.canvas.toBlob(function (blob) {
-                if (!blob || gen !== fitGen) return;
-                const img = layers[k], old = img.src;
-                img.src = URL.createObjectURL(blob);
-                if (old && old.indexOf('blob:') === 0) setTimeout(function () { URL.revokeObjectURL(old); }, 1000);
-            });
-        });
+        layers.forEach(function (svg, k) { svg.setAttribute('viewBox', '0 0 ' + cssW + ' ' + cssH); svg.innerHTML = parts[k].join(''); });
     }
     let resizeTimer = 0;
     window.addEventListener('resize', function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(fit, 140); });
@@ -7980,8 +7978,12 @@
 
         // Началният екран се попълва веднага щом страницата е прочетена - не чака шрифтовете и библиотеките от интернет
         function bootApp() {
-            initWelcomeScreen();
-            calculate(); // Правим първоначална калкулация, за да изглежда добре приложението отзад
+            try {
+                initWelcomeScreen();
+                calculate(); // Правим първоначална калкулация, за да изглежда добре приложението отзад
+            } finally {
+                document.documentElement.classList.remove('hz-booting');   // всичко е готово - показваме началния екран наведнъж
+            }
         }
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootApp); else bootApp();
 
