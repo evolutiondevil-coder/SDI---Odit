@@ -2417,29 +2417,43 @@
         .rs .rs-dot .rs-ok { background: none; box-shadow: none; }
         .rs .rs-dot.is-auto .rs-ok { color: #0f766e; }
 
-        /* Подредба: мека плоча; плъзгачите остават точно под бутоните отгоре */
-        .rs .rs-sliders { grid-template-columns: calc(8.4rem - .7rem) minmax(0, 1fr); margin-top: .3rem; padding: .6rem .45rem .65rem .7rem;
-            border: 0; border-radius: 1.1rem; background: var(--rs-key); box-shadow: var(--rs-raise); }
-        html.dark .rs .rs-sliders { border: 0; }
-        .rs .rs-sliders .rs-lbl { gap: .45rem; }
-        .rs .rs-sliders .rs-lbl-txt em { white-space: normal; }
+        /* Подредба: отделна мека плоча - отгоре заглавие (иконка + „Подредба“ + подсказка на един ред), отдолу 5 еднакви плъзгача */
+        .rs .rs-sliders { grid-template-columns: minmax(0, 1fr); gap: .75rem; margin-top: .45rem; padding: .75rem 1.1rem .95rem;
+            border: 1px solid rgba(255,255,255,.9); border-radius: 1.25rem; background: var(--rs-key); box-shadow: var(--rs-raise); }
+        html.dark .rs .rs-sliders { border: 1px solid rgba(255,255,255,.06); }
+        .rs .rs-sliders .rs-lbl { gap: .6rem; }
+        .rs .rs-sliders .rs-lbl-txt { flex-direction: row; align-items: baseline; gap: .65rem; }
+        .rs .rs-sliders .rs-lbl-txt em { white-space: nowrap; font-size: .72rem; font-weight: 600; color: var(--rs-mute); }
+        .rs .rs-sl-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .6rem 1.15rem; }
+        .rs .rs-sliders { container-type: inline-size; }
+        @container (max-width: 40rem) { .rs .rs-sl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }   /* тесен панел: 3 плъзгача на ред, без отрязани надписи */
+        .rs .rs-slider { gap: .4rem; }
+        .rs .rs-sl-top { justify-content: space-between; align-items: center; letter-spacing: .03em; }
+        .rs .rs-sl-top output, .rs .rs-slider.is-center .rs-sl-top output { flex: none; min-width: 1.9rem; padding: .1rem .38rem; border-radius: 999px; text-align: center;
+            font: 800 .7rem 'JetBrains Mono', monospace; color: #0f766e; background: rgba(20,184,166,.1); box-shadow: inset 0 0 0 1px rgba(20,184,166,.18); }
+        html.dark .rs .rs-sl-top output, html.dark .rs .rs-slider.is-center .rs-sl-top output { color: #5eead4; background: rgba(45,212,191,.1); box-shadow: inset 0 0 0 1px rgba(45,212,191,.2); }
         .rs input.rs-range[type=range]::-webkit-slider-runnable-track { box-shadow: inset 1px 1px 2px rgba(15,23,42,.18), 0 1px 0 rgba(255,255,255,.9);
             background: linear-gradient(90deg, #5eead4 0, #14b8a6 var(--p), var(--rs-track) var(--p) 100%); }
         .rs .rs-slider.is-center input.rs-range[type=range]::-webkit-slider-runnable-track {
             background: linear-gradient(90deg, var(--rs-track) 0 min(50%, var(--p)), #14b8a6 min(50%, var(--p)) max(50%, var(--p)), var(--rs-track) max(50%, var(--p)) 100%); }
+        /* всички дръжки са еднакви - тюркоазени 3D топчета */
         .rs input.rs-range[type=range]::-webkit-slider-thumb { border: 0;
             background: radial-gradient(circle at 34% 28%, #ccfbf1 0 10%, #2dd4bf 38%, #0f766e 100%);
             box-shadow: 0 3px 6px -1px rgba(13,148,136,.55), inset 0 -2px 3px rgba(0,0,0,.18); }
-        .rs .rs-slider:nth-child(even) input.rs-range[type=range]::-webkit-slider-thumb {
-            background: radial-gradient(circle at 34% 28%, #94a3b8 0 10%, #334155 40%, #0f172a 100%); box-shadow: 0 3px 6px -1px rgba(15,23,42,.55), inset 0 -2px 3px rgba(0,0,0,.3); }
-        html.dark .rs .rs-slider:nth-child(even) input.rs-range[type=range]::-webkit-slider-thumb {
-            background: radial-gradient(circle at 34% 28%, #e2e8f0 0 10%, #94a3b8 40%, #475569 100%); box-shadow: 0 3px 6px -1px rgba(0,0,0,.6), inset 0 -2px 3px rgba(0,0,0,.25); }
         .rs input.rs-range[type=range]::-moz-range-progress { background: linear-gradient(90deg, #5eead4, #14b8a6); }
         .rs input.rs-range[type=range]::-moz-range-thumb { border: 0; background: radial-gradient(circle at 34% 28%, #ccfbf1 0 10%, #2dd4bf 38%, #0f766e 100%); }
-        .rs .rs-slider:nth-child(even) input.rs-range[type=range]::-moz-range-thumb { background: radial-gradient(circle at 34% 28%, #94a3b8 0 10%, #334155 40%, #0f172a 100%); }
+
+        /* Иконите и сенките имат място да реагират: съдържанието е с малко въздух отвътре, а рамката (която реже заради
+           плавното прибиране) е разширена със същото - така нищо не излиза извън нея и не се отрязва */
+        .rs .rs-body { margin: 0 -.7rem; }
+        .rs .rs-body-in { padding: .9rem .7rem .7rem; }
+        .rs:not(.is-collapsed) { padding-bottom: .3rem; }
+        .rs { transition: padding-bottom .38s ease; }
 
         @media (max-width: 760px) {
-            .rs .rs-sliders { grid-template-columns: minmax(0, 1fr); padding: .6rem .7rem .7rem; }
+            .rs .rs-sliders { padding: .7rem .8rem .85rem; }
+            .rs .rs-sl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .55rem 1rem; }
+            .rs .rs-sliders .rs-lbl-txt em { white-space: normal; }
         }
         /* ===== Разделител между конзолата и прегледа на отчета (касова бележка) ===== */
         .rp-divider { position: relative; height: 2.9rem; margin-top: .15rem; pointer-events: none; }
@@ -4022,10 +4036,14 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '3.95',
+        version: '3.96',
         date: '28.10.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '3.96', date: '28.10.2026', notes: [
+                '„Дизайн на отчета“: иконите вече не се отрязват, когато реагират на мишката',
+                'По-подреден панел „Подредба“: заглавие и подсказка на един ред, 5 еднакви плъзгача с тюркоазени дръжки и стойности в хапчета'
+            ] },
             { version: '3.95', date: '28.10.2026', notes: [
                 'Логото на „Наличности“ реагира на мишката: при посочване се повдига, светва и през него минава отблясък, а при задържане банкнотите се „броят“',
                 'Реагират и останалите лога, които досега стояха неподвижни: „Общо банкноти“, „Общо монети“, „Общо физически“, Western Union в „Оборот за деня“, златното € в „Общо“, иконките в „Дизайн на отчета“ и „WU корекция“'
