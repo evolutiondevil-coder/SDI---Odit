@@ -1410,6 +1410,48 @@
         .gs-leg > div { font-size: .72rem; font-weight: 800; color: var(--gs-mut); }
         .gs-leg b { display: block; margin-top: .1rem; font-size: 1.05rem; font-weight: 900; color: var(--gs-ink); white-space: nowrap; }
         .gs-leg > div:last-child { text-align: right; margin-right: calc(100% - 100% / 1.08 - 6px); }
+        /* ===== Скала „Преброено спрямо очакваното“ – реалистичен вид: матово стъкло, вдлъбнат улей,
+           лъскава тръба (синьо → тюркоазено → цвят на състоянието), метален маркер и лъскав процент ===== */
+        .gs .gs-scale { --fe: #2fd15a; --pc1: #39c873; --pc2: #12924a; --pglow: rgba(34,197,94,.6);
+            position: relative; margin-top: .9rem; padding: 1.15rem 1.3rem 1.15rem; border-radius: 1.4rem;
+            background: linear-gradient(180deg, rgba(255,255,255,.82) 0%, rgba(243,245,248,.66) 100%);
+            border: 1px solid rgba(255,255,255,.95);
+            box-shadow: inset 0 1px 0 #fff, inset 0 -1px 0 rgba(15,23,42,.04), 0 0 0 1px rgba(15,23,42,.07),
+                        0 20px 36px -24px rgba(15,23,42,.5), 0 3px 8px -4px rgba(15,23,42,.14); }
+        .gs .gs-scale::before { content: ''; position: absolute; left: 1.2rem; right: 1.2rem; top: 0; height: 1px; border-radius: 1px; pointer-events: none;
+            background: linear-gradient(90deg, rgba(255,255,255,0), #fff 20%, #fff 80%, rgba(255,255,255,0)); }
+        .gs .gs-scale.st-minus { --fm: #8b5cf6; --fe: #f43f5e; --pc1: #f26161; --pc2: #c81e1e; --pglow: rgba(239,68,68,.55); }
+        .gs .gs-scale.st-wait, .gs .gs-scale.st-zero { --pc1: #a3afc0; --pc2: #6b7789; --pglow: rgba(100,116,139,.35); }
+        .gs .gs-scale-h { margin-bottom: 1.05rem; }
+        .gs .gs-scale-h > span:first-child { font-size: .76rem; font-weight: 900; letter-spacing: .09em; color: #13233f; }
+        .gs .gs-scale .gs-pct { font-size: 1.12rem; font-weight: 900; letter-spacing: -.01em; color: #fff; padding: .42rem 1.1rem; border: 0;
+            background: linear-gradient(180deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 45%), linear-gradient(180deg, var(--pc1), var(--pc2));
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.4), inset 0 -2px 4px rgba(0,0,0,.18), 0 0 0 1px rgba(0,0,0,.05),
+                        0 4px 10px -4px var(--pglow);
+            text-shadow: 0 1px 1px rgba(0,0,0,.3); }
+        .gs .gs-scale .gs-bar { height: 24px; border: 0; border-radius: 999px;
+            background: linear-gradient(180deg, #e1e5eb 0%, #eef1f5 55%, #f5f7fa 100%);
+            box-shadow: inset 0 2px 4px rgba(15,23,42,.16), inset 0 -1px 1px rgba(255,255,255,.95), 0 0 0 1px rgba(15,23,42,.07), 0 1px 0 #fff; }
+        .gs .gs-scale .gs-fill { top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) * var(--w, 0)) !important; border-radius: 999px;
+            background: linear-gradient(180deg, rgba(255,255,255,.7) 0%, rgba(255,255,255,.18) 34%, rgba(255,255,255,0) 50%, rgba(0,0,0,.08) 78%, rgba(0,0,0,.2) 100%),
+                        linear-gradient(90deg, #1d3ee3 0%, #1c7ee6 32%, var(--fm, #17b4cf) 60%, var(--fe) 100%);
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 6px 12px -6px rgba(29,62,227,.75), 0 0 12px -3px var(--fe); }
+        .gs .gs-scale .gs-mark { left: calc(4px + (100% - 8px) / 1.08); top: -11px; bottom: -11px; width: 7px; margin-left: -3.5px; border-radius: 4px; z-index: 1;
+            background: linear-gradient(90deg, #7d838c 0%, #c9ced5 28%, #f4f6f8 46%, #b6bbc3 66%, #767c85 100%);
+            box-shadow: 0 2px 5px rgba(15,23,42,.38), inset 0 0 0 .5px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.7); }
+        .gs .gs-scale .gs-mark::after { bottom: -6px; margin-left: -6px; border-width: 6px; border-top-color: #8a9098; filter: drop-shadow(0 1px 1px rgba(15,23,42,.25)); }
+        .gs .gs-scale .gs-leg { margin-top: 1.45rem; align-items: flex-end; }
+        .gs .gs-scale .gs-leg > div { font-size: 1.12rem; font-weight: 500; color: #6b7a90; }
+        .gs .gs-scale .gs-leg > div:last-child { color: #13233f; }
+        .gs .gs-scale .gs-leg b { margin-top: .2rem; font-size: 1.75rem; font-weight: 900; letter-spacing: -.015em; color: #13233f; line-height: 1.1; }
+        .gs .gs-scale .gs-leg b span { font-weight: 600 !important; opacity: .85 !important; }
+        html.dark .gs .gs-scale { background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.035)); border-color: rgba(255,255,255,.12);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 0 0 1px rgba(0,0,0,.25), 0 22px 40px -24px rgba(0,0,0,.9); }
+        html.dark .gs .gs-scale::before { opacity: .25; }
+        html.dark .gs .gs-scale-h > span:first-child, html.dark .gs .gs-scale .gs-leg > div:last-child, html.dark .gs .gs-scale .gs-leg b { color: #e8eef8; }
+        html.dark .gs .gs-scale .gs-leg > div { color: #94a3b8; }
+        html.dark .gs .gs-scale .gs-bar { background: linear-gradient(180deg, rgba(0,0,0,.45), rgba(0,0,0,.25));
+            box-shadow: inset 0 2px 4px rgba(0,0,0,.55), inset 0 -1px 0 rgba(255,255,255,.06), 0 0 0 1px rgba(255,255,255,.06); }
         /* Цветовете на панела: лъскави точки в капсула, избраният е с пръстен */
         .gs-dots { display: inline-flex; align-items: center; gap: .4rem; padding: .38rem .6rem; border-radius: 999px; background: rgba(255,255,255,.6);
             border: 1px solid rgba(255,255,255,.9); box-shadow: 0 0 0 1px rgba(15,23,42,.05), 0 8px 18px -14px rgba(15,23,42,.5); }
@@ -3973,10 +4015,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '3.85',
+        version: '3.86',
         date: '28.10.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '3.86', date: '28.10.2026', notes: [
+                'Нов вид на „Преброено спрямо очакваното“: матово стъкло, лъскава 3D лента във вдлъбнат улей, метален щифт за очакваната сума, лъскав процент (зелен/червен/сив) и по-едри суми'
+            ] },
             { version: '3.85', date: '28.10.2026', notes: [
                 '„Монети по каси“: всяка каса е в свой ред, леко оцветен в цвета на касата, с цветна лента отляво - касите се различават от пръв поглед'
             ] },
@@ -5551,7 +5596,7 @@
                 const ratio = expected > 0 ? cashInRegister / expected : (counted ? MAX : 0);
                 const fill = document.getElementById('gsScaleFill');
                 scale.className = `gs-scale ${diffState}`;
-                if (fill) fill.style.width = (counted ? Math.max(0, Math.min(100, ratio / MAX * 100)) : 0) + '%';
+                if (fill) { const w = counted ? Math.max(0, Math.min(1, ratio / MAX)) : 0; fill.style.width = (w * 100) + '%'; fill.style.setProperty('--w', w); }
                 const pctEl = document.getElementById('gsScalePct');
                 if (pctEl) pctEl.textContent = !counted ? '0 %' : (expected > 0 ? (ratio * 100).toFixed(1).replace('.', ',') + ' %' : '—');
                 const ce = document.getElementById('gsScaleCounted'), ee = document.getElementById('gsScaleExpected');
