@@ -306,8 +306,9 @@
         .bn-sum .bn-sum-eur { flex: none; display: block; height: 2.65rem; width: auto; filter: drop-shadow(0 3px 4px rgba(0,0,0,.45)); user-select: none; pointer-events: none; }
         .bn-sum .bn-sum-lbl, .bn-sum #bnMainTotal { font-family: 'Open Sans', 'Segoe UI', Roboto, sans-serif; font-weight: 700; font-size: 1.6rem; line-height: 1; letter-spacing: 0; margin-top: 0; }
         .bn-sum .bn-sum-lbl { text-transform: lowercase; color: #f3f4f3; text-shadow: 0 2px 3px rgba(0,0,0,.35); }
-        .bn-sum #bnMainTotal { color: #f5c400; text-shadow: 0 2px 3px rgba(0,0,0,.3); }
-        .bn-sum #bnMainTotal > span { color: #f5c400; font-size: 1em; font-weight: 700; margin-left: .3em; text-shadow: inherit; }
+        /* Сумата: по-дебел шрифт и по-светло жълто с тъмен контур - чете се ясно върху зеленото */
+        .bn-sum #bnMainTotal { color: #ffe45c; font-weight: 800; text-shadow: 0 1px 0 rgba(0,40,20,.55), 0 2px 5px rgba(0,0,0,.45), 0 0 14px rgba(255,228,92,.25); }
+        .bn-sum #bnMainTotal > span { color: #ffe45c; font-size: 1em; font-weight: 800; margin-left: .3em; text-shadow: inherit; }
         .bn-sum .bn-sum-copy { opacity: 1; right: .75rem; width: 2.35rem; height: 2.35rem; padding: 0; display: grid; place-items: center; color: #dcc48e;
             background: radial-gradient(circle at 38% 30%, rgba(255,255,255,.14) 0%, rgba(0,0,0,.22) 70%); border: 1.5px solid rgba(220,235,225,.35);
             box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 4px 10px -4px rgba(0,0,0,.55); backdrop-filter: blur(4px); }
@@ -4036,10 +4037,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '3.96',
+        version: '3.97',
         date: '28.10.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '3.97', date: '28.10.2026', notes: [
+                'Калкулатор Банкноти: сумата в „Общо“ е с по-дебел шрифт и по-светло жълто - вижда се по-добре'
+            ] },
             { version: '3.96', date: '28.10.2026', notes: [
                 '„Дизайн на отчета“: иконите вече не се отрязват, когато реагират на мишката',
                 'По-подреден панел „Подредба“: заглавие и подсказка на един ред, 5 еднакви плъзгача с тюркоазени дръжки и стойности в хапчета'
