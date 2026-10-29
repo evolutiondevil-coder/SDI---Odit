@@ -4087,10 +4087,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.02',
+        version: '4.03',
         date: '29.10.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.03', date: '29.10.2026', notes: [
+                '„Дизайн на отчета“: посочването с мишката вече не сменя отчета - промяната се вижда само след клик върху избора'
+            ] },
             { version: '4.02', date: '29.10.2026', notes: [
                 'Нови бутони за сваляне („Свали банкноти“, „Свали заедно“, „Свали наличности“, „Свали всички“): реалистично цветно стъкло с метален бутон, надписите са със стария шрифт'
             ] },
@@ -5027,7 +5030,7 @@
                             <span class="rs-logo">${STUDIO_SVG.logo}</span>
                             <span class="rs-tt">
                                 <b>Дизайн на отчета</b>
-                                <small class="rs-sub-open">Посочи за преглед · кликни за избор</small>
+                                <small class="rs-sub-open">Кликни за избор - отчетът се сменя веднага</small>
                                 <small class="rs-sub-closed">${skinName} · ${decoName} · ${fontName}</small>
                             </span>
                             <span class="rs-mini" aria-hidden="true">${studioThemeThumb(currentSkin)}<span class="rs-mini-ico"${icoColor ? ` style="--ic:${icoColor}"` : ''}>${studioDecoSvg(currentDecoration)}</span><span class="rs-mini-font" style="font-family:${currentFont}">Aa</span></span>
@@ -5113,17 +5116,8 @@
             studioApplyVisual(prevDeco !== currentDecoration);
             studioSetRowPreview(p.kind, null);
         }
-        document.addEventListener('pointerover', e => {
-            const c = e.target.closest && e.target.closest('#designStudio [data-pick]');
-            if (c && e.pointerType !== 'touch') studioPreviewStart(c.dataset.pick, c.dataset.val, c.dataset.name);
-        }, { passive: true });
-        document.addEventListener('pointerout', e => {
-            if (!studioPreview) return;
-            const c = e.target.closest && e.target.closest('#designStudio [data-pick]');
-            if (!c) return;
-            const to = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('#designStudio [data-pick]');
-            if (!to) studioPreviewEnd();
-        }, { passive: true });
+        // v4.03: посочването с мишката вече НЕ сменя отчета - промяната се прилага само при клик (избор).
+        // (studioPreviewStart/End остават, но не се извикват)
 
         // --- Плъзгачи ---
         function studioSyncSlider(kind, el) {
