@@ -1702,6 +1702,14 @@
         .dl-btn.dl-glass .dl-txt { flex: 1 1 auto; align-items: center; text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,.4), 0 0 1px rgba(0,0,0,.25); }
         .dl-btn.dl-glass .dl-txt b { font-size: 14px; }
         .dl-btn.dl-glass .dl-txt small { font-size: 11px; opacity: 1; color: var(--dl-sub); }
+        /* v4.05: надписът е центриран точно в стъклото вляво от иконката, а размерът му следва ширината на бутона - никога не излиза извън него */
+        /* (процентите в padding се смятат от родителя, не от бутона - затова надписът е в абсолютна кутия, чиито left/right са от самия бутон;
+            --dl-w е ширината на бутона в px, задава се от скрипта) */
+        .dl-btn.dl-glass { padding: 0; }
+        .dl-btn.dl-glass .dl-txt { position: absolute; top: 0; bottom: 0; left: 6.5%; right: calc(100% - var(--dl-cx) + var(--dl-d) * .55 + 2.5%);
+            justify-content: center; align-items: center; }
+        .dl-btn.dl-glass .dl-txt b { font-size: min(15px, calc(var(--dl-w, 290px) * .051)); letter-spacing: .07em; }
+        .dl-btn.dl-glass .dl-txt small { font-size: min(11.5px, calc(var(--dl-w, 290px) * .039)); margin-top: .25em; }
         /* металният бутон е част от картинката - отгоре остава само въртящият се пръстен при посочване */
         .dl-btn.dl-glass .dl-ico { position: absolute; top: 50%; left: var(--dl-cx); width: var(--dl-d); height: auto; aspect-ratio: 1; transform: translate(-50%, -50%);
             background: none; box-shadow: none; }
@@ -4093,10 +4101,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.04',
+        version: '4.05',
         date: '30.10.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.05', date: '30.10.2026', notes: [
+                'Бутоните за сваляне: надписите са центрирани точно в стъклото вляво от иконката и се смаляват с бутона, без да излизат извън него'
+            ] },
             { version: '4.04', date: '30.10.2026', notes: [
                 'Бутоните за сваляне имат нова иконка вдясно: синя 3D монета с бяла стрелка и вълни'
             ] },
@@ -6631,6 +6642,13 @@
         // Свалените снимки: 4 пъти по-голяма резолюция от екрана (общите отчети - 3 пъти, за да не тежат на по-слаб компютър)
         // и PNG (без загуба - буквите и иконките остават остри)
         const REPORT_SCALE = 4, REPORT_SCALE_WIDE = 3;
+        // Ширината на стъклените бутони за сваляне -> --dl-w (размерът на надписа следва бутона)
+        (function () {
+            if (!('ResizeObserver' in window)) return;
+            const ro = new ResizeObserver(es => es.forEach(e => e.target.style.setProperty('--dl-w', e.target.offsetWidth + 'px')));
+            const scan = () => document.querySelectorAll('.dl-btn.dl-glass').forEach(b => { if (!b.__dlw) { b.__dlw = 1; ro.observe(b); } });
+            scan(); new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
+        })();
         function reportImageUrl(canvas, bgEl) {
             const out = document.createElement('canvas');
             out.width = canvas.width; out.height = canvas.height;
