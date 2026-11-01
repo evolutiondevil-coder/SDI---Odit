@@ -1534,6 +1534,16 @@
             box-shadow: 0 0 0 1px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.14), 0 12px 22px -14px rgba(0,0,0,.7); }
         html.dark .gs .gs-diff.st-wait .gs-diff-l { color: #e2e6f3; text-shadow: 0 2px 3px rgba(0,0,0,.4); }
         html.dark .gs .gs-diff.st-wait .gs-diff-l small { color: #b9c1d8; text-shadow: none; }
+        /* v4.23: бутонът „ДОБАВИ“ по образеца - лъскаво червено 3D хапче със светъл кант отгоре и бял релефен надпис */
+        .gs .gs-diff .gs-act.gs-act-add { padding: .85rem 1.55rem; border-radius: 1.05rem; font-size: 1rem; font-weight: 900; letter-spacing: .04em; color: #fff;
+            background: radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.38) 0%, rgba(255,255,255,0) 48%), linear-gradient(180deg, #f2302d 0%, #d4171a 55%, #ad0e12 100%);
+            border: 1px solid rgba(120,8,10,.55);
+            box-shadow: inset 0 1.5px 0 rgba(255,255,255,.55), inset 0 -3px 6px rgba(80,0,0,.35), 0 0 0 1px rgba(255,255,255,.35), 0 10px 18px -8px rgba(185,20,24,.75);
+            text-shadow: 0 1px 0 rgba(120,0,0,.6), 0 2px 3px rgba(0,0,0,.25); transition: transform .3s cubic-bezier(.34,1.5,.64,1), filter .2s ease, box-shadow .2s ease; }
+        .gs .gs-diff .gs-act.gs-act-add:hover { filter: brightness(1.08); transform: translateY(-2px);
+            box-shadow: inset 0 1.5px 0 rgba(255,255,255,.6), inset 0 -3px 6px rgba(80,0,0,.35), 0 0 0 1px rgba(255,255,255,.4), 0 14px 22px -9px rgba(185,20,24,.85); }
+        .gs .gs-diff .gs-act.gs-act-add:active { transform: translateY(1px) scale(.97); box-shadow: inset 0 3px 6px rgba(80,0,0,.45), 0 4px 8px -4px rgba(185,20,24,.6); }
+        html.dark .gs .gs-diff .gs-act.gs-act-add { border-color: rgba(0,0,0,.4); box-shadow: inset 0 1.5px 0 rgba(255,255,255,.45), inset 0 -3px 6px rgba(80,0,0,.4), 0 10px 18px -8px rgba(0,0,0,.7); }
         @media (max-width: 520px) {
             .gs .gs-diff.st-wait { gap: .75rem; }
             .gs .gs-diff.st-wait::before { width: 2.9rem; height: 2.9rem; }
@@ -4277,10 +4287,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.22',
+        version: '4.23',
         date: '01.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.23', date: '01.11.2026', notes: [
+                'Нов бутон „ДОБАВИ“ в проверката на касата: лъскаво червено 3D хапче с бял релефен надпис'
+            ] },
             { version: '4.22', date: '01.11.2026', notes: [
                 '„Подредба“ в „Дизайн на отчета“: вместо подсказката „Двоен клик - нула“ има бутон „Нулирай“, който връща само плъзгачите по подразбиране'
             ] },
@@ -5908,7 +5921,7 @@
             const diffBox = document.getElementById('gsDiff');
             const counted = totalRealCash !== 0;
             const diffState = !counted ? 'st-wait' : cashDiff > 0 ? 'st-tip' : cashDiff < 0 ? 'st-minus' : 'st-ok';
-            const gsBtn = (kind, amount) => `<button data-html2canvas-ignore="true" onclick="openTipDiffModal('${kind}', ${amount})" class="gs-act">${kind === 'take' ? 'ВЗЕМИ' : 'ДОБАВИ'}</button>`;
+            const gsBtn = (kind, amount) => `<button data-html2canvas-ignore="true" onclick="openTipDiffModal('${kind}', ${amount})" class="gs-act${kind === 'take' ? '' : ' gs-act-add'}">${kind === 'take' ? 'ВЗЕМИ' : 'ДОБАВИ'}</button>`;
             if (realCashDisplay) realCashDisplay.innerHTML = counted ? formatCurrencySmall(totalRealCash) : '—';
             const takeRow = document.getElementById('gsTakeRow'), afterRow = document.getElementById('gsAfterRow');
             if (takeRow && afterRow) {
