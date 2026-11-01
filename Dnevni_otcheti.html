@@ -1863,12 +1863,10 @@
         html.dark .cr-head-v2 .cr-tag-ofc { color: #e0e7ff; background: linear-gradient(180deg, rgba(129,140,248,.26), rgba(79,70,229,.18)); border-color: rgba(165,180,252,.25); box-shadow: 0 8px 16px -10px rgba(0,0,0,.6); }
         html.dark .cr-head-v2 .cr-tag-ofc svg { color: #c7d2fe; }
         html.dark .cr-head-v2 .cr-sdi { color: #1f1b2e; background: linear-gradient(180deg, #ffe7cf 0%, #fbc08e 100%); }
-        /* Разделител под заглавието: вместо твърда линия - мека линия, която избледнява към краищата, с ромбче в средата */
+        /* Разделител под заглавието: вместо твърда линия - мека линия, която избледнява към краищата */
         .cr-head.cr-head-v2 { position: relative; }
         .cr-head-v2::after { content: ''; position: absolute; left: 6%; right: 6%; bottom: 0; height: 1px; pointer-events: none;
             background: linear-gradient(90deg, rgba(37,99,235,0) 0%, rgba(37,99,235,.28) 30%, rgba(16,185,129,.35) 50%, rgba(37,99,235,.28) 70%, rgba(37,99,235,0) 100%); }
-        .cr-head-v2::before { content: ''; position: absolute; left: 50%; bottom: -4px; width: 8px; height: 8px; margin-left: -4px; transform: rotate(45deg); border-radius: 2px; pointer-events: none;
-            background: linear-gradient(135deg, #6ee7b7, #10b981); box-shadow: 0 0 0 3px rgba(16,185,129,.12), 0 0 8px rgba(16,185,129,.45); }
         html.dark .cr-head-v2::after { background: linear-gradient(90deg, rgba(110,231,183,0) 0%, rgba(129,140,248,.3) 30%, rgba(110,231,183,.4) 50%, rgba(129,140,248,.3) 70%, rgba(110,231,183,0) 100%); }
         .cr-head-v2 .cr-tag { transition: transform .4s cubic-bezier(.34,1.5,.64,1); }
         .cr-head-v2 .cr-tag:hover { transform: translateY(-2px); }
@@ -4247,10 +4245,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.19',
+        version: '4.20',
         date: '01.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.20', date: '01.11.2026', notes: [
+                '„Наличности“: махнато е ромбчето в средата на линията под заглавието - остава само меката линия'
+            ] },
             { version: '4.19', date: '01.11.2026', notes: [
                 '„Наличности“: твърдата линия под заглавието е заменена с мека линия, която избледнява към краищата, с ментово ромбче в средата'
             ] },
