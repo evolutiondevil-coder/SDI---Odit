@@ -2261,6 +2261,26 @@
         #deficitTrigger.oc-nudge .dt-hint { opacity: 1; transform: translate(50%, 0); }
         #deficitTrigger.oc-nudge .dt-btn { animation: dt-shake .4s ease; }
         @keyframes dt-shake { 0%, 100% { translate: 0 0; } 25% { translate: -3px 0; } 50% { translate: 3px 0; } 75% { translate: -2px 0; } }
+        /* ===== v4.09: „Въведи минус от предходен ден“ по образеца - тъмно стъкло с прекъснат сьомгов кант, червена 3D плочка
+           със стрелка надолу, релефен сьомгов надпис и катинарче ===== */
+        #appHeader .dt-btn, html.dark #appHeader .dt-btn {
+            gap: .55rem !important; padding: 0 .8rem 0 .5rem !important; justify-content: flex-start !important;
+            border: 2px dashed rgba(241,160,140,.85) !important; color: #f4a28d !important;
+            background: linear-gradient(180deg, rgba(255,255,255,.11) 0%, rgba(255,255,255,.05) 55%, rgba(255,255,255,.035) 100%) !important;
+            -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+            box-shadow: inset 0 1.5px 0 rgba(255,255,255,.14), inset 0 -10px 18px -10px rgba(0,0,0,.35), 0 14px 26px -14px rgba(0,0,0,.75) !important; }
+        #appHeader #deficitTrigger:hover .dt-btn { border-style: dashed !important; border-color: rgba(252,180,160,1) !important;
+            background: linear-gradient(180deg, rgba(255,255,255,.15) 0%, rgba(255,255,255,.07) 55%, rgba(255,255,255,.05) 100%) !important;
+            box-shadow: inset 0 1.5px 0 rgba(255,255,255,.18), 0 0 18px -4px rgba(248,113,113,.45), 0 14px 26px -14px rgba(0,0,0,.75) !important; }
+        #appHeader .dt-btn .ico { width: 2.2rem; height: 2.2rem; border-radius: .68rem; color: #fff;
+            background: linear-gradient(160deg, #f45b55 0%, #dc2626 55%, #a61b1b 100%);
+            box-shadow: inset 0 1.5px 0 rgba(255,255,255,.4), inset 0 -3px 5px rgba(0,0,0,.25), 0 6px 10px -4px rgba(0,0,0,.55); }
+        #appHeader .dt-btn .ico > svg { width: 64%; height: 64%; stroke-width: 2.6; filter: drop-shadow(0 1.5px 1px rgba(80,0,0,.45)); }
+        #appHeader .dt-btn .dt-txt { flex: 1 1 auto; min-width: 0; text-align: center; font-size: var(--dt-fs, 12px); font-weight: 900; letter-spacing: 0;
+            color: #f7a893; text-shadow: 0 1px 0 rgba(120,40,30,.55), 0 2px 4px rgba(0,0,0,.35); }
+        #appHeader .dt-btn .dt-lock { width: 1.05rem; height: 1.05rem; color: #e8a9a0; opacity: .7; }
+        #appHeader .dt-btn .dt-lock rect { fill-opacity: 0; }
+        @media (min-width: 768px) { #appHeader .dt-btn .ico { width: 2.45rem; height: 2.45rem; } }
         /* Защита при премахване на каса: първо натискане „въоръжава“, второто премахва */
         .reg-remove-hint { position: absolute; left: 50%; top: calc(100% + .4rem); transform: translate(-50%, -4px); padding: .15rem .55rem; border-radius: 999px;
             font-size: .6rem; font-weight: 800; letter-spacing: .02em; text-transform: none; white-space: nowrap; color: #9f1239;
@@ -3024,7 +3044,7 @@
                             <!-- Trigger Button (двоен клик - лека защита от случайно отваряне) -->
                             <button onclick="deficitTriggerClick(event)" ondblclick="openDeficitFromTrigger(event)" title="Двоен клик за въвеждане на минус от предходен ден" class="dt-btn w-full relative overflow-hidden bg-transparent hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400 px-5 py-3 rounded-full font-bold shadow-sm transition-all duration-300 ease-out border-2 border-dashed border-red-300 dark:border-red-500/30 flex items-center justify-center gap-3 h-14 md:h-16">
                                 <span class="ico ico-red ico-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5l6 6 3.6-3.6 7.4 7.4"/><path d="M20.5 12.3v5h-5"/></svg></span>
-                                <span class="text-[11px] md:text-xs tracking-[0.04em] uppercase text-left leading-tight whitespace-nowrap">Въведи минус от предходен ден</span>
+                                <span class="dt-txt text-[11px] md:text-xs tracking-[0.04em] uppercase text-left leading-tight whitespace-nowrap">Въведи минус от предходен ден</span>
                                 <span class="dt-lock" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor" fill-opacity=".2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg></span>
                             </button>
                         </div>
@@ -4190,10 +4210,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.08',
+        version: '4.09',
         date: '01.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.09', date: '01.11.2026', notes: [
+                'Нов вид на „Въведи минус от предходен ден“: тъмно стъкло с прекъснат сьомгов кант, червена 3D плочка със стрелка, релефен надпис и катинарче'
+            ] },
             { version: '4.08', date: '01.11.2026', notes: [
                 'Нови бутони в горния панел: стъклени кръгове със светещи ментови иконки (мащаб, проверка, тъмен режим), ментова плочка за мащаба и зелено 3D хапче „НУЛИРАНЕ“'
             ] },
@@ -6742,6 +6765,14 @@
         // Свалените снимки: 4 пъти по-голяма резолюция от екрана (общите отчети - 3 пъти, за да не тежат на по-слаб компютър)
         // и PNG (без загуба - буквите и иконките остават остри)
         const REPORT_SCALE = 4, REPORT_SCALE_WIDE = 3;
+        // „Въведи минус от предходен ден“: надписът е на един ред - шрифтът се смалява, докато се събере (между 9 и 14 px)
+        function fitDeficitText() {
+            const t = document.querySelector('#deficitTrigger .dt-txt'); if (!t || !t.clientWidth) return;
+            let fs = 14; t.style.setProperty('--dt-fs', fs + 'px');
+            while (t.scrollWidth > t.clientWidth + .5 && fs > 9) { fs -= .25; t.style.setProperty('--dt-fs', fs + 'px'); }
+        }
+        window.addEventListener('resize', () => requestAnimationFrame(fitDeficitText));
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitDeficitText);
         // Ширината на стъклените бутони за сваляне -> --dl-w (размерът на надписа следва бутона)
         (function () {
             if (!('ResizeObserver' in window)) return;
@@ -7999,6 +8030,7 @@
             calculate();
             if(typeof calcBN === 'function') calcBN();
             if(typeof calculateWuCorrection === 'function') calculateWuCorrection();
+            if (typeof fitDeficitText === 'function') requestAnimationFrame(fitDeficitText);
         }
 
         // Защита от случайно затваряне на таба
@@ -8228,6 +8260,7 @@
                 calculate(); // Правим първоначална калкулация, за да изглежда добре приложението отзад
             } finally {
                 document.documentElement.classList.remove('hz-booting');   // всичко е готово - показваме началния екран наведнъж
+            if (typeof fitDeficitText === 'function') fitDeficitText();
             }
         }
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootApp); else bootApp();
