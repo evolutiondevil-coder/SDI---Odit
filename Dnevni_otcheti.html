@@ -983,6 +983,14 @@
         @media (prefers-reduced-motion: reduce) {
             .wl-logo::after, .wl-play .wl-receipt, .wl-play .wl-bar, .wl-play .wl-coin { animation: none !important; }
         }
+        /* Логото на началния екран реагира на мишката като главното лого: стълбчетата израстват едно след друго,
+           а монетата се завърта (реакция на мишката - работи и при изключени анимации в Windows) */
+        #welcomeLogo.hz-logo { transition: transform .5s cubic-bezier(.34,1.5,.64,1), box-shadow .4s ease; }
+        #welcomeLogo.hz-logo:hover { transform: translateY(-3px) scale(1.07) rotate(-4deg); }
+        #welcomeLogo:hover .wl-b1 { animation: hd-grow .55s cubic-bezier(.3,1.4,.5,1) both !important; }
+        #welcomeLogo:hover .wl-b2 { animation: hd-grow .55s cubic-bezier(.3,1.4,.5,1) .1s both !important; }
+        #welcomeLogo:hover .wl-b3 { animation: hd-grow .55s cubic-bezier(.3,1.4,.5,1) .2s both !important; }
+        #welcomeLogo:hover .wl-coin { animation: hd-coin .9s cubic-bezier(.3,1.3,.5,1) .15s both !important; }
 
         /* ===== Икони на полетата (модерни плочки с двуслойна иконка) ===== */
         .ico {
@@ -4224,10 +4232,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.16',
+        version: '4.17',
         date: '01.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.17', date: '01.11.2026', notes: [
+                'Логото на началния екран реагира на мишката като главното: стълбчетата израстват едно след друго, а монетата се завърта'
+            ] },
             { version: '4.16', date: '01.11.2026', notes: [
                 'Поправено: анимацията на главното лого (и отблясъкът на логото на „Наличности“) не тръгваше, когато в Windows са изключени анимациите - реакциите на мишката вече работят винаги'
             ] },
@@ -8024,6 +8035,13 @@
                 }
             }, 1000);
         }
+
+        // Началното „отпечатване“ на логото на началния екран е еднократно: щом свърши, класът се маха, за да не тръгне
+        // наново, когато мишката излезе от логото (confirmOfficeChange го слага пак при връщане към началния екран)
+        (function () {
+            const wl = document.getElementById('welcomeLogo');
+            if (wl) wl.addEventListener('animationend', e => { if (e.animationName === 'wl-coin') wl.classList.remove('wl-play'); });
+        })();
 
         // Обособена функция, която реално стартира и разкрива самото приложение след 10-те секунди
         function proceedToApp(instant) {
