@@ -1033,9 +1033,9 @@
             transform: skewX(-12deg); animation: wl-glint 6.5s ease-in-out 1.6s infinite; }
         .hd-logo3d:hover { transform: translateY(-3px) scale(1.07) rotate(-4deg); filter: drop-shadow(0 14px 18px rgba(0,0,0,.5)) drop-shadow(0 0 14px rgba(45,212,191,.35)); }
         #appHeader .hd-title { white-space: nowrap; font-size: 1.6rem; font-weight: 900; letter-spacing: .005em; color: #f6f7f5 !important;
-            text-shadow: 0 1px 0 #cfd6d3, 0 2px 0 #a9b4b0, 0 3px 0 #87938f, 0 5px 8px rgba(0,0,0,.5); filter: none; }
-        #appHeader .hd-sub { white-space: nowrap; margin-top: .45rem; font-size: .95rem; font-weight: 900; letter-spacing: .02em; color: #5fdcae !important;
-            text-shadow: 0 1px 0 #3a9b77, 0 2px 0 #2a7559, 0 3px 5px rgba(0,0,0,.45); }
+            text-shadow: 0 1px 0 rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.35); filter: none; -webkit-font-smoothing: antialiased; }
+        #appHeader .hd-sub { white-space: nowrap; margin-top: .45rem; font-size: .95rem; font-weight: 900; letter-spacing: .02em; color: #6ee7b7 !important;
+            text-shadow: 0 1px 0 rgba(0,0,0,.35), 0 2px 5px rgba(0,0,0,.3); filter: none; -webkit-font-smoothing: antialiased; }
         #appHeader .hd-logo3d + div { gap: 0; }
         @media (min-width: 768px) { .hd-logo3d { width: 4.5rem; height: 4.5rem; } #appHeader .hd-title { font-size: 1.85rem; } #appHeader .hd-sub { font-size: 1.05rem; } }
         @media (max-width: 480px) { .hd-logo3d { width: 3.4rem; height: 3.4rem; } #appHeader .hd-title { font-size: 1.4rem; } #appHeader .hd-sub { font-size: .82rem; } }
@@ -4207,10 +4207,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.13',
+        version: '4.14',
         date: '01.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.14', date: '01.11.2026', notes: [
+                'По-четливи надписи „ДНЕВНИ ОТЧЕТИ“ и „СИСТЕМА ЗА ОТЧИТАНЕ“ в горния панел - без наслоените сенки, които ги размазваха'
+            ] },
             { version: '4.13', date: '01.11.2026', notes: [
                 'Ново главно лого в горния панел: стъклена зелена плочка с бележка, цветни стълбчета и златна евро монета, бял релефен надпис „ДНЕВНИ ОТЧЕТИ“ и ментов „СИСТЕМА ЗА ОТЧИТАНЕ“'
             ] },
