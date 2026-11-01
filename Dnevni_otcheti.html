@@ -2714,10 +2714,22 @@
         html.dark .rs .rs-sliders { border: 1px solid rgba(255,255,255,.06); }
         .rs .rs-sliders .rs-lbl { gap: .6rem; }
         .rs .rs-sliders .rs-lbl-txt { flex-direction: row; align-items: baseline; gap: .65rem; }
+        .rs .rs-sl-head { width: 100%; }
+        .rs .rs-sl-reset { margin-left: auto; display: inline-flex; align-items: center; gap: .35rem; height: 1.9rem; padding: 0 .75rem 0 .55rem; border-radius: 999px; cursor: pointer;
+            font: 800 .68rem Inter, sans-serif; letter-spacing: .05em; text-transform: uppercase; color: #0f766e;
+            background: linear-gradient(180deg, #f0fdfa 0%, #ccfbf1 100%); border: 1px solid rgba(20,184,166,.35);
+            box-shadow: inset 0 1px 0 #fff, 0 3px 8px -4px rgba(13,148,136,.5); transition: transform .3s cubic-bezier(.34,1.5,.64,1), box-shadow .2s ease; }
+        .rs .rs-sl-reset svg { width: .95rem; height: .95rem; transition: transform .5s cubic-bezier(.34,1.5,.64,1); }
+        .rs .rs-sl-reset:hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 #fff, 0 6px 12px -5px rgba(13,148,136,.6); }
+        .rs .rs-sl-reset:hover svg { transform: rotate(-200deg); }
+        .rs .rs-sl-reset:active { transform: scale(.96); }
+        html.dark .rs .rs-sl-reset { color: #5eead4; background: rgba(45,212,191,.12); border-color: rgba(45,212,191,.3); box-shadow: none; }
         .rs .rs-sliders .rs-lbl-txt em { white-space: nowrap; font-size: .72rem; font-weight: 600; color: var(--rs-mute); }
         .rs .rs-sl-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .6rem 1.15rem; }
         .rs .rs-sliders { container-type: inline-size; }
-        @container (max-width: 40rem) { .rs .rs-sl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }   /* тесен панел: 3 плъзгача на ред, без отрязани надписи */
+        @container (max-width: 40rem) { .rs .rs-sl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @container (max-width: 25rem) { .rs .rs-sliders .rs-sl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @container (max-width: 16rem) { .rs .rs-sliders .rs-sl-grid { grid-template-columns: minmax(0, 1fr); } }   /* тесен панел: 3 плъзгача на ред, без отрязани надписи */
         .rs .rs-slider { gap: .4rem; }
         .rs .rs-sl-top { justify-content: space-between; align-items: center; letter-spacing: .03em; }
         .rs .rs-sl-top output, .rs .rs-slider.is-center .rs-sl-top output { flex: none; min-width: 1.9rem; padding: .1rem .38rem; border-radius: 999px; text-align: center;
@@ -4265,10 +4277,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.21',
+        version: '4.22',
         date: '01.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.22', date: '01.11.2026', notes: [
+                '„Подредба“ в „Дизайн на отчета“: вместо подсказката „Двоен клик - нула“ има бутон „Нулирай“, който връща само плъзгачите по подразбиране'
+            ] },
             { version: '4.21', date: '01.11.2026', notes: [
                 'Нов вид на „Още не е преброено“: лавандулово стъкло със сребрист ръб, тъмна плочка с часовник и релефен надпис'
             ] },
@@ -5282,7 +5297,7 @@
                             ${row('color', 'Цвят', studioLblImg('color'), colorName, colors, decoActive ? '' : ' is-dim')}
                             ${row('font', 'Шрифт', studioLblImg('font'), fontName, fonts)}
                             <div class="rs-sliders">
-                                <div class="rs-lbl"><span class="rs-lbl-ico">${studioLblImg('size')}</span><span class="rs-lbl-txt"><b>Подредба</b><em>Двоен клик - нула</em></span></div>
+                                <div class="rs-lbl rs-sl-head"><span class="rs-lbl-ico">${studioLblImg('size')}</span><span class="rs-lbl-txt"><b>Подредба</b></span><button type="button" class="rs-sl-reset" onclick="studioSlidersReset()" title="Връща ширината, кутията и позициите по подразбиране"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v4h4"/></svg><span>Нулирай</span></button></div>
                                 <div class="rs-sl-grid">
                                     ${slider('width', 'Ширина', 50, 100)}
                                     ${slider('inner', 'Кутия', 20, 100)}
@@ -5371,6 +5386,9 @@
             studioSlide(kind, el);
             el.dispatchEvent(new Event('input', { bubbles: true }));   // автоматичен запис
         }
+
+        // Бутонът „Нулирай“ в „Подредба“ - връща само плъзгачите (ширина, кутия, позиции) по подразбиране
+        function studioSlidersReset() { Object.keys(STUDIO_SLIDER_DEFAULTS).forEach(studioSliderReset); }
 
         // --- Прибиране на конзолата (помни се за този компютър) ---
         function toggleStudio() {
