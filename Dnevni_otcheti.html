@@ -1053,7 +1053,7 @@
         .hd-logo3d:hover .hd-coin { animation: hd-coin .9s cubic-bezier(.3,1.3,.5,1) .15s both; }
         @keyframes hd-grow { 0% { transform: scaleY(.08); } 100% { transform: scaleY(1); } }
         @keyframes hd-coin { 0% { transform: rotate(0) scale(1); } 45% { transform: rotate(-200deg) scale(1.16); } 100% { transform: rotate(-360deg) scale(1); } }
-        @media (prefers-reduced-motion: reduce) { .hd-logo3d .hd-l { animation: none !important; } }
+        /* реакция на мишката - работи и когато в Windows са изключени анимациите (както останалите лога) */
         @media (min-width: 768px) { .hd-logo3d { width: 4.5rem; height: 4.5rem; } #appHeader .hd-title { font-size: 1.85rem; } #appHeader .hd-sub { font-size: 1.05rem; } }
         @media (max-width: 480px) { .hd-logo3d { width: 3.4rem; height: 3.4rem; } #appHeader .hd-title { font-size: 1.4rem; } #appHeader .hd-sub { font-size: .82rem; } }
         /* ===== Полетата в касите: „полуготовност“ при посочване с мишката ===== */
@@ -1817,7 +1817,7 @@
         html.dark .cr-head:hover .cr-logo-3d { box-shadow: 0 0 0 5px rgba(96,165,250,.18), 0 18px 30px -12px rgba(0,0,0,.8); }
         @keyframes cr-glint { 0% { opacity: 0; transform: translateX(-130%) skewX(-16deg); } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; transform: translateX(330%) skewX(-16deg); } }
         @keyframes cr-count { 0%, 100% { transform: translateY(-1px) scale(1.02) rotate(-6deg); } 50% { transform: translateY(-3px) scale(1.04) rotate(2deg); } }
-        @media (prefers-reduced-motion: reduce) { .cr-head:hover .cr-logo-3d::after, .cr-logo-3d:active { animation: none !important; } }
+        /* реакция на мишката - работи и когато в Windows са изключени анимациите */
         /* Всяко лого реагира на мишката: при посочване на реда си иконката се повдига, уголемява и леко завърта */
         #cashReportInner .cr-chip, #cashReportInner .cr-mix img, .gs-wu-logo, .bn-sum .bn-sum-eur, .rs .rs-lbl-ico, #calcSection [ondblclick^="wuHeaderDblClick"] .ico {
             transition: transform .45s cubic-bezier(.34,1.5,.64,1), box-shadow .3s ease, filter .3s ease; }
@@ -4224,10 +4224,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.15',
+        version: '4.16',
         date: '01.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.16', date: '01.11.2026', notes: [
+                'Поправено: анимацията на главното лого (и отблясъкът на логото на „Наличности“) не тръгваше, когато в Windows са изключени анимациите - реакциите на мишката вече работят винаги'
+            ] },
             { version: '4.15', date: '01.11.2026', notes: [
                 'Главното лого отново е „живо“: при посочване стълбчетата израстват едно след друго, а евро монетата се завърта'
             ] },
