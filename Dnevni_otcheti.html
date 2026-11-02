@@ -706,6 +706,9 @@
         @media (max-width: 480px) { #warningModal #warningProceedBtn, #warningModal #warningProceedBtn:disabled, #warningModal #warningProceedBtn:not(:disabled) { width: min(100%, 17rem) !important; font-size: 1.05rem; }
             #warningModal .wm-list { margin-bottom: 1.3rem; } }
         @media (prefers-reduced-motion: reduce) { #warningModal #warningProceedBtn:disabled::before { animation: none; clip-path: none; } }
+        /* v4.34: щом броенето свърши и излезе „ДА ЗАПОЧВАМЕ“, бутонът леко и бавно пулсира (работи и при изключени анимации в Windows) */
+        #warningModal #warningProceedBtn:not(:disabled) { animation: wm-ready .55s cubic-bezier(.2,.9,.25,1.2), wm-go-pulse 2.6s ease-in-out .7s infinite; }
+        @keyframes wm-go-pulse { 0%, 100% { scale: 1; } 50% { scale: 1.035; } }
 
         /* ===== Системен тест (диагностика) ===== */
         #sysTestModal .st-card {
@@ -4402,10 +4405,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.33',
+        version: '4.34',
         date: '02.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.34', date: '02.11.2026', notes: [
+                'Бутонът „ДА ЗАПОЧВАМЕ“ леко и бавно пулсира, след като броенето свърши'
+            ] },
             { version: '4.33', date: '02.11.2026', notes: [
                 '„Бакшиш“ е направен наново по образеца с по-добро качество: гладки ъгли на панела, по-ясни плочка със стрелка и бутон „ВЗЕМИ“ (1:1), по-едра сума както на образеца'
             ] },
