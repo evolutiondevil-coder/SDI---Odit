@@ -1424,12 +1424,18 @@
         html.dark .gs .gs-diff.st-ok { --c: #a7f3d0; --soft: linear-gradient(135deg, rgba(16,185,129,.55), rgba(5,150,105,.45)); --cbd: rgba(110,231,183,.6); }
         /* Бакшиш: пулсиращ ореол (подсказва, че има какво да се направи) и реакция при посочване */
         .gs-diff { position: relative; transition: transform .3s cubic-bezier(.22,1,.36,1), box-shadow .3s ease, border-color .3s ease; }
-        .gs-diff.st-tip::after { content: ''; position: absolute; inset: -1.5px; border-radius: inherit; pointer-events: none;
-            animation: gs-tip-ring 2s ease-out infinite; }
+        /* v4.39: „Бакшиш“ (зелено) и „Разлика“ (червено) пулсират с двойна вълна - две вълни една след друга, в цвета на ситуацията */
+        .gs .gs-diff.st-tip { --pc: 22,163,74; }
+        .gs .gs-diff.st-minus { --pc: 220,38,38; }
+        .gs-diff.st-tip, .gs-diff.st-minus { isolation: isolate; }
+        .gs-diff.st-tip::after, .gs-diff.st-minus::after, .gs-diff.st-tip::before, .gs-diff.st-minus::before {
+            content: ''; position: absolute; inset: -1.5px; z-index: -1; border-radius: inherit; pointer-events: none;
+            animation: gs-pulse-wave 2.4s ease-out infinite; }
+        .gs-diff.st-tip::before, .gs-diff.st-minus::before { animation-delay: 1.2s; }
         .gs-diff.st-tip > .gs-diff-ico { animation: gs-tip-ico 2s ease-in-out infinite; }
         .gs-diff.st-tip:hover:not(:has(.gs-diff-ico:hover, .gs-act:hover)) { transform: translateY(-2px); border-color: var(--c); box-shadow: 0 0 0 4px rgba(16,185,129,.16), 0 16px 30px -16px var(--c); }
         .gs-diff.st-tip > .gs-diff-ico:hover { animation: none; transform: scale(1.08) rotate(-6deg); transition: transform .3s cubic-bezier(.3,1.6,.5,1); }
-        @keyframes gs-tip-ring { 0% { box-shadow: 0 0 0 0 rgba(16,185,129,.5); } 70%, 100% { box-shadow: 0 0 0 11px rgba(16,185,129,0); } }
+        @keyframes gs-pulse-wave { 0% { box-shadow: 0 0 0 0 rgba(var(--pc),.65); } 100% { box-shadow: 0 0 0 18px rgba(var(--pc),0); } }
         @keyframes gs-tip-ico { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
         .gs::before { content: ''; position: absolute; left: 19px; top: 24px; bottom: 44px; width: 2px; border-radius: 2px; background: var(--gs-line); }
         .gs-step { position: relative; display: flex; gap: 1rem; padding-bottom: .9rem; }
@@ -4463,10 +4469,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.38',
-        date: '02.11.2026',
+        version: '4.39',
+        date: '03.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.39', date: '03.11.2026', notes: [
+                '„Бакшиш“ и „Разлика“ пулсират по-видимо с двойна вълна - две вълни една след друга; зелено при бакшиш, червено при разлика'
+            ] },
             { version: '4.38', date: '02.11.2026', notes: [
                 'Новият вид от 4.36 е върнат за „Разлика“, „Още не е преброено“, „Въведохте ли минуса от предходния ден?“ и „Общ стартов баланс“; само „Бакшиш“ остава както преди - зелен панел със златен кант'
             ] },
