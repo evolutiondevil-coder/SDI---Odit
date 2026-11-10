@@ -38,6 +38,9 @@ import com.odit.obd.BuildConfig
 import com.odit.obd.uds.FoundModule
 import com.odit.obd.uds.ModuleAddress
 import com.odit.obd.data.AppPackSource
+import com.odit.obd.data.DataPacks
+import com.odit.obd.data.PackUpdater
+import com.odit.obd.obd.DtcDatabase
 import com.odit.obd.data.PackInfo
 import com.odit.obd.garage.CarRecord
 import com.odit.obd.garage.Garage
@@ -46,8 +49,6 @@ import com.odit.obd.garage.ScanRecord
 import com.odit.obd.vehicle.UserVehicle
 import com.odit.obd.vehicle.VehicleDecoder
 import com.odit.obd.vehicle.VehicleIdentity
-import com.odit.obd.vehicle.VinRules
-import com.odit.obd.vehicle.WmiDb
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -186,9 +187,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------ car data
     private val packs = AppPackSource(app)
-    @Volatile private var wmiDb: WmiDb = WmiDb.EMPTY
-    @Volatile private var vinRules: VinRules = VinRules.EMPTY
-    private val decoder: VehicleDecoder get() = VehicleDecoder(wmiDb, vinRules)
+    @Volatile private var data: DataPacks = DataPacks.EMPTY
+    private val decoder: VehicleDecoder get() = VehicleDecoder(data.wmi, data.vinRules)
     private val realGarage = Garage(File(app.filesDir, "garage"))
     private val demoGarage = Garage(File(app.cacheDir, "demo-garage"))
     private val garage: Garage get() = if (demo) demoGarage else realGarage
@@ -207,12 +207,60 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                wmiDb = runCatching { WmiDb.parse(packs.read("wmi")) }.getOrDefault(WmiDb.EMPTY)
-                vinRules = runCatching { VinRules.parse(packs.read("vin-rules")) }.getOrDefault(VinRules.EMPTY)
-            }
+            reloadPacks()
             refreshGarage()
-            recomputeVehicle()
+            maybeUpdatePacks()
+        }
+    }
+
+    private suspend fun reloadPacks() {
+        data = withContext(Dispatchers.IO) { runCatching { DataPacks.load(packs) }.getOrDefault(DataPacks.EMPTY) }
+        recomputeVehicle()
+    }
+
+    /** When the data packs were last checked for updates (0 = never). */
+    var packsCheckedAt by mutableStateOf(prefs.getLong("packsCheckedAt", 0L))
+        private set
+    var packsUpdating by mutableStateOf(false)
+        private set
+    private var packCheckForMake: String? = null
+
+    /**
+     * Downloads newer data packs (at most once a day, or when a make is recognised that may have its
+     * own pack). Runs on the network scope; the app keeps using the current packs meanwhile.
+     */
+    fun maybeUpdatePacks(force: Boolean = false) {
+        if (!onlineEnabled || demo || packsUpdating) return
+        val make = vehicle.make?.value?.lowercase()
+        val due = force || System.currentTimeMillis() - packsCheckedAt > 24 * 3600_000L || (make != null && make != packCheckForMake)
+        if (!due) return
+        packCheckForMake = make
+        val app = getApplication<Application>()
+        packsUpdating = true
+        onlineScope.launch {
+            val result = if (Network.isOnline(app)) {
+                PackUpdater(http, File(app.filesDir, "odit-data")).update(
+                    localVersion = { packs.version(it) },
+                    wanted = { e -> e.makes.isEmpty() || (make != null && make in e.makes) || e.id in packs.ids() },
+                )
+            } else {
+                null
+            }
+            withContext(Dispatchers.Main) {
+                packsUpdating = false
+                if (result?.reachable == true) {
+                    packsCheckedAt = System.currentTimeMillis()
+                    prefs.edit().putLong("packsCheckedAt", packsCheckedAt).apply()
+                    if (result.updated.isNotEmpty()) {
+                        reloadPacks()
+                        message = "Обновени данни: ${result.updated.joinToString()}"
+                    } else if (force) {
+                        message = "Данните са актуални."
+                    }
+                } else if (force) {
+                    message = "Няма връзка със сървъра за данни."
+                }
+            }
         }
     }
 
@@ -243,7 +291,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         onlineEnabled = enabled
         onlineAsked = true
         prefs.edit().putBoolean("online", enabled).putBoolean("onlineAsked", true).apply()
-        if (enabled) car?.let { maybeDecodeOnline(it) }
+        if (enabled) {
+            car?.let { maybeDecodeOnline(it) }
+            maybeUpdatePacks()
+        }
     }
 
     private val vehicleProvider: OnlineVehicleDecoder
@@ -285,7 +336,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Titles of the bundled / downloaded data packs and their sources (shown in "Информация"). */
-    fun dataSources(): List<PackInfo> = listOfNotNull(wmiDb.info, vinRules.info)
+    fun dataSources(): List<PackInfo> = data.infos
 
     private var transport: ObdTransport? = null
     private var session: ObdSession? = null
@@ -535,10 +586,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         recomputeVehicle()
         refreshGarage()
         maybeDecodeOnline(record)
+        maybeUpdatePacks()
     }
 
     private fun recomputeVehicle() {
         vehicle = if (overview.vin == null && car == null) VehicleIdentity.UNKNOWN else decoder.decode(overview.vin, car?.user, car?.online)
+        // Selects the manufacturer pack for trouble-code descriptions.
+        DtcDatabase.currentMake = vehicle.make?.value
     }
 
     private fun updateCar(change: (CarRecord) -> CarRecord) {

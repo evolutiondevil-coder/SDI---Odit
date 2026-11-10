@@ -55,6 +55,18 @@ fun OnlineSettingCard(vm: MainViewModel) {
             Switch(checked = vm.onlineEnabled, onCheckedChange = { vm.setOnline(it) })
         }
         Text(onlineExplanation(vm.onlineSends), color = Palette.Muted, style = MaterialTheme.typography.bodySmall)
+        if (vm.onlineEnabled) {
+            val at = vm.packsCheckedAt
+            Text(
+                if (at == 0L) "Данните още не са проверявани за обновления."
+                else "Последна проверка за обновени данни: " +
+                    java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.US).format(java.util.Date(at)),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            TextButton(onClick = { vm.maybeUpdatePacks(force = true) }, enabled = !vm.packsUpdating) {
+                Text(if (vm.packsUpdating) "Проверка…" else "Провери за обновени данни")
+            }
+        }
     }
 }
 

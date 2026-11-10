@@ -77,7 +77,7 @@ fun HomeScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             VehicleCard(vm, onEditVin = { editVin = true }, onEditCar = { editCar = true })
-            VinConflictCard(vm.overview.vinReport)
+            VinConflictCard(vm.overview.vinReport, vm.modules.modules)
 
             vm.vehicleError?.let { err ->
                 InfoCard(color = Palette.Warn.copy(alpha = 0.15f)) {
@@ -171,7 +171,7 @@ private fun VehicleCard(vm: MainViewModel, onEditVin: () -> Unit, onEditCar: () 
         OnlineBusyNote(vm)
         if (o.vin != null) {
             KeyValue("VIN", o.vin)
-            vinOrigin(o)?.let { KeyValue("", it) }
+            vinOrigin(o, vm.modules.modules)?.let { KeyValue("", it) }
         } else if (vm.vehicleReady && vm.busy == null) {
             KeyValue("VIN", "не е намерен")
         }

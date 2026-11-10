@@ -23,6 +23,9 @@ data class Dtc(
 
     val description: String get() = DtcDatabase.describe(code)
 
+    /** Set when the description comes from a manufacturer pack (shown under the text). */
+    val descriptionSource: String? get() = DtcDatabase.lookup(code).source
+
     val ftbDescription: String? get() = ftb?.takeIf { it != 0 }?.let { DtcDatabase.failureType(it) }
 
     companion object {

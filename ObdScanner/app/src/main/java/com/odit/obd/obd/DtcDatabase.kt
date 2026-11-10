@@ -8,9 +8,47 @@ object DtcDatabase {
 
     private val map: Map<String, String> by lazy { build() }
 
-    fun describe(code: String): String = map[code.uppercase()] ?: generic(code.uppercase())
+    /** Codes for one group of makes, from a downloadable pack. */
+    class BrandCodes(val makes: Set<String>, val title: String, val codes: Map<String, String>)
 
-    fun isKnown(code: String): Boolean = map.containsKey(code.uppercase())
+    /** Extra / corrected generic descriptions from the "dtc-generic" pack. */
+    @Volatile var genericPack: Map<String, String> = emptyMap()
+
+    /** Manufacturer packs ("dtc-ford", ...). */
+    @Volatile var brandPacks: List<BrandCodes> = emptyList()
+
+    /** Make of the connected car; selects the manufacturer pack. */
+    @Volatile var currentMake: String? = null
+
+    /** A description and, when it comes from a manufacturer pack, where from. */
+    data class Text(val text: String, val source: String?)
+
+    fun describe(code: String): String = lookup(code).text
+
+    fun lookup(code: String, make: String? = currentMake): Text {
+        val c = code.uppercase()
+        if (make != null && isManufacturerSpecific(c)) {
+            val m = make.lowercase()
+            val pack = brandPacks.firstOrNull { m in it.makes }
+            pack?.codes?.get(c)?.let { return Text(it, "от пакета „${pack.title}“ (непроверено)") }
+        }
+        genericPack[c]?.let { return Text(it, null) }
+        map[c]?.let { return Text(it, null) }
+        return Text(generic(c), null)
+    }
+
+    fun isKnown(code: String): Boolean = map.containsKey(code.uppercase()) || genericPack.containsKey(code.uppercase())
+
+    /** P1, P30–P33, B1/B2, C1/C2, U1/U2 (SAE J2012 manufacturer-controlled ranges). */
+    fun isManufacturerSpecific(code: String): Boolean {
+        if (code.length < 5) return false
+        val d1 = code[1]
+        return when (code[0]) {
+            'P' -> d1 == '1' || (d1 == '3' && code[2] in "0123")
+            'B', 'C', 'U' -> d1 == '1' || d1 == '2'
+            else -> false
+        }
+    }
 
     private fun build(): Map<String, String> {
         val m = HashMap<String, String>(1400)

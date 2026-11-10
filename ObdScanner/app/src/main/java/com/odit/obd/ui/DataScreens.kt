@@ -219,7 +219,7 @@ fun InfoScreen(vm: MainViewModel, snackbar: SnackbarHostState, onExportLog: () -
                 InfoCard {
                     Text("Автомобил", fontWeight = FontWeight.SemiBold)
                     KeyValue("VIN", vm.overview.vin ?: "не е намерен")
-                    vinOrigin(vm.overview)?.let { KeyValue("Източник", it) }
+                    vinOrigin(vm.overview, vm.modules.modules)?.let { KeyValue("Източник", it) }
                     VehicleRows(vm.vehicle, showSources = true)
                     KeyValue("Протокол", vm.protocol?.title ?: "—")
                     TextButton(onClick = { editVin = true }, contentPadding = PaddingValues(0.dp)) {
@@ -230,10 +230,10 @@ fun InfoScreen(vm: MainViewModel, snackbar: SnackbarHostState, onExportLog: () -
                 if (sources.size > 1 && !vm.overview.vinReport.conflict) {
                     InfoCard {
                         Text("VIN е потвърден от ${sources.size} модула", fontWeight = FontWeight.SemiBold)
-                        for (f in sources) Text(vinSourceText(f), color = Palette.Muted, style = MaterialTheme.typography.bodySmall)
+                        for (f in sources) Text(vinSourceText(f, vm.modules.modules), color = Palette.Muted, style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                VinConflictCard(vm.overview.vinReport)
+                VinConflictCard(vm.overview.vinReport, vm.modules.modules)
                 InfoCard {
                     Text("Адаптер", fontWeight = FontWeight.SemiBold)
                     KeyValue("Версия", vm.adapterVersion.ifBlank { "—" })

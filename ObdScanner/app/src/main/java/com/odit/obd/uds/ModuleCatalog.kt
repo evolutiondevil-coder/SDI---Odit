@@ -20,7 +20,12 @@ object ModuleCatalog {
         std(0x7E1, "Скоростна кутия"),
     )
 
-    private val byBrand: Map<Brand, List<ModuleAddress>> = mapOf(
+    /** Module lists from the "modules" pack; when present they replace the built-in ones. */
+    @Volatile var packGroups: Map<Brand, List<ModuleAddress>> = emptyMap()
+
+    private val byBrand: Map<Brand, List<ModuleAddress>> get() = packGroups.ifEmpty { builtIn }
+
+    private val builtIn: Map<Brand, List<ModuleAddress>> = mapOf(
         Brand.VAG to listOf(
             vag(0x713, "ABS / ESP (спирачки)"), vag(0x715, "Въздушни възглавници"),
             vag(0x714, "Арматурно табло"), vag(0x70E, "Централна електроника (BCM)"),

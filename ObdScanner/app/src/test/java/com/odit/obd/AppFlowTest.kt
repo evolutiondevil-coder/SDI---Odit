@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
@@ -81,9 +82,7 @@ class AppFlowTest {
 
     @Test
     fun demoFlow() {
-        waitForText("Онлайн помощ")
-        compose.onNodeWithText("Включи").performClick()
-        pump()
+        answerIntro(true)
         waitForText("Търси адаптери")
         shot("01_connect")
 
@@ -127,5 +126,83 @@ class AppFlowTest {
         waitForText("Лампата на двигателя не свети")
         waitWhileBusy("Изтриване")
         shot("07_after_clear")
+    }
+
+    /** The first-run "Онлайн помощ" question (shown only while it has not been answered). */
+    private fun answerIntro(enable: Boolean) {
+        waitForText("Търси адаптери")
+        pump(300)
+        val button = if (enable) "Включи" else "Не, без интернет"
+        if (compose.onAllNodesWithText(button).fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithText(button).performClick()
+            pump()
+        }
+    }
+
+    /** Starts a demo car from the scenario dialog. */
+    private fun startDemo(title: String, online: Boolean = true) {
+        answerIntro(online)
+        click("Демо режим (без автомобил)")
+        waitForText(title)
+        if (!online) {
+            compose.onNodeWithText("Симулирай интернет (онлайн помощ)").performClick()
+            pump()
+        }
+        compose.onNodeWithText(title).performClick()
+        pump()
+        waitForText("Грешки на двигателя")
+        waitWhileBusy("Свързване")
+        waitWhileBusy("Четене на данни")
+        waitWhileBusy("Търсене на допълнителни данни онлайн")
+    }
+
+    @Test
+    fun vinFoundOnlyAfterModuleScan() {
+        startDemo("VIN само в друг модул")
+        waitForText("не е намерен")
+        shot("10_vin_missing")
+        compose.onNodeWithText("Всички модули").performClick()
+        click("Бързо")
+        waitForText("Намерени модули")
+        back()
+        waitForText("WVWZZZ1KZ8W123456")
+        waitForText("UDS 22 F190")
+        shot("11_vin_from_module")
+    }
+
+    @Test
+    fun conflictingVinsAreShown() {
+        startDemo("Различни VIN в модулите")
+        compose.onNodeWithText("Всички модули").performClick()
+        click("Бързо")
+        waitForText("Намерени модули")
+        back()
+        waitForText("Различни VIN в модулите")
+        shot("12_vin_conflict")
+    }
+
+    @Test
+    fun unknownMakeOfflineShowsCountry() {
+        startDemo("Непозната марка", online = false)
+        waitForText("Беларус")
+        repeat(400) { pump(10) } // give a (wrong) online answer time to appear
+        assertTrue(compose.onAllNodesWithText("онлайн", substring = true).fetchSemanticsNodes().isEmpty())
+        shot("13_unknown_wmi_offline")
+    }
+
+    @Test
+    fun unknownMakeOnlineFillsMake() {
+        startDemo("Непозната марка", online = true)
+        waitForText("MAZ (онлайн, вероятно)")
+        shot("14_unknown_wmi_online")
+    }
+
+    @Test
+    fun kLineVinViaKwp() {
+        startDemo("Стара кола (K-line)", online = false)
+        waitForText("VF1BB0A0526123456")
+        waitForText("KWP 1A 90")
+        waitForText("Renault")
+        shot("15_kline")
     }
 }

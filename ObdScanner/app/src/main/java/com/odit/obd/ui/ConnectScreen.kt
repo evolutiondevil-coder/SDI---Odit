@@ -49,7 +49,10 @@ fun ConnectScreen(vm: MainViewModel, snackbar: SnackbarHostState, withBluetooth:
             title = { Text("Демо автомобил") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        Modifier.fillMaxWidth().clickable { vm.demoOnline = !vm.demoOnline },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Checkbox(checked = vm.demoOnline, onCheckedChange = { vm.demoOnline = it })
                         Text("Симулирай интернет (онлайн помощ)", style = MaterialTheme.typography.bodyMedium)
                     }

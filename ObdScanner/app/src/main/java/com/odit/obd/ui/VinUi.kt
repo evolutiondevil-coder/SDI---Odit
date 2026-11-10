@@ -18,24 +18,30 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.odit.obd.obd.ObdSession
+import com.odit.obd.uds.FoundModule
 import com.odit.obd.vin.VinFound
 import com.odit.obd.vin.VinParser
 import com.odit.obd.vin.VinReport
 
-fun vinSourceText(f: VinFound): String {
-    val ecu = if (f.ecu == "?") "неизвестен модул" else "${ObdSession.ecuName(f.ecu)} (${f.ecu})"
+fun vinSourceText(f: VinFound, modules: List<FoundModule> = emptyList()): String {
+    val module = modules.firstOrNull { it.responseHeader == f.ecu }
+    val ecu = when {
+        f.ecu == "?" -> "неизвестен модул"
+        module != null -> "${module.title} (${f.ecu})"
+        else -> "${ObdSession.ecuName(f.ecu)} (${f.ecu})"
+    }
     return "$ecu · ${f.method.title}"
 }
 
 /** Where the VIN shown came from, in one line. */
-fun vinOrigin(o: Overview): String? = when {
+fun vinOrigin(o: Overview, modules: List<FoundModule> = emptyList()): String? = when {
     o.vinManual -> "въведен ръчно"
-    else -> o.vinReport.found.firstOrNull { it.vin == o.vin }?.let { vinSourceText(it) }
+    else -> o.vinReport.found.firstOrNull { it.vin == o.vin }?.let { vinSourceText(it, modules) }
 }
 
 /** Warning shown when modules report different VINs. */
 @Composable
-fun VinConflictCard(report: VinReport) {
+fun VinConflictCard(report: VinReport, modules: List<FoundModule> = emptyList()) {
     if (!report.conflict) return
     InfoCard(color = Palette.Warn.copy(alpha = 0.15f)) {
         Text("Различни VIN в модулите", color = Palette.Warn, fontWeight = FontWeight.SemiBold)
@@ -45,7 +51,7 @@ fun VinConflictCard(report: VinReport) {
         )
         for (f in report.found) {
             Text(f.vin, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold)
-            Text(vinSourceText(f), color = Palette.Muted, style = MaterialTheme.typography.bodySmall)
+            Text(vinSourceText(f, modules), color = Palette.Muted, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

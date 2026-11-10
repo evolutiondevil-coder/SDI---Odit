@@ -5,9 +5,15 @@ import org.json.JSONObject
 import java.io.File
 
 /** Where pack JSON comes from: the copy bundled in the APK, a downloaded update, or test files. */
-fun interface PackSource {
+interface PackSource {
     /** Full text of pack [id] (e.g. "wmi"), or null if there is none. */
     fun read(id: String): String?
+
+    /** Ids of all packs available. */
+    fun ids(): Set<String>
+
+    /** Version of the pack that [read] returns, 0 if none. */
+    fun version(id: String): Int = read(id)?.let { runCatching { JSONObject(it).optInt("version") }.getOrNull() } ?: 0
 }
 
 /** Metadata common to all packs. */
@@ -30,6 +36,12 @@ object PackFormat {
 class AppPackSource(private val context: Context) : PackSource {
     private val downloaded = File(context.filesDir, "odit-data/packs")
 
+    override fun ids(): Set<String> {
+        val bundled = runCatching { context.assets.list("odit-data/packs")?.toList() }.getOrNull().orEmpty()
+        val local = downloaded.list()?.toList().orEmpty()
+        return (bundled + local).filter { it.endsWith(".json") }.map { it.removeSuffix(".json") }.toSet()
+    }
+
     override fun read(id: String): String? {
         val bundled = runCatching {
             context.assets.open("odit-data/packs/$id.json").bufferedReader().use { it.readText() }
@@ -47,4 +59,6 @@ class AppPackSource(private val context: Context) : PackSource {
 /** Reads packs from a directory (tests, tools). */
 class DirPackSource(private val dir: File) : PackSource {
     override fun read(id: String): String? = File(dir, "$id.json").takeIf { it.isFile }?.readText()
+
+    override fun ids(): Set<String> = dir.list()?.filter { it.endsWith(".json") }?.map { it.removeSuffix(".json") }?.toSet().orEmpty()
 }
