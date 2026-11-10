@@ -164,6 +164,9 @@ class ObdSession(val elm: Elm327, private val log: CommLog) {
             runCatching { elm.send("ATSHDB33F1", 2_000) }
         } else if (protocol.isCan) {
             runCatching { elm.send("ATSH7DF", 2_000) }
+        } else if (protocol == ObdProtocol.KWP_FAST || protocol == ObdProtocol.KWP_SLOW) {
+            // ELM327 default header for ISO 14230-4 (functional OBD request).
+            runCatching { elm.send("ATSHC133F1", 2_000) }
         }
         runCatching { elm.send("ATST32", 2_000) }
         runCatching { elm.send("ATAT1", 2_000) }
@@ -287,20 +290,10 @@ class ObdSession(val elm: Elm327, private val log: CommLog) {
 
     // ---------------------------------------------------------- vehicle info
 
+    /** VIN from OBD mode 09 PID 02 only (see [com.odit.obd.vin.VinReader] for the full chain). */
     suspend fun readVin(): String? {
-        val msgs = request("0902", 6_000).positive(0x09).filter { it.data.size >= 2 && it.data[1] == 0x02 }
-        if (msgs.isEmpty()) return null
-        val byEcu = msgs.groupBy { it.header }
-        val first = byEcu["7E8"] ?: byEcu.values.first()
-        val ordered = if (protocol.isCan) first else first.sortedBy { it.data.getOrElse(2) { 0 } }
-        val text = buildString {
-            for (m in ordered) for (i in 2 until m.data.size) {
-                val c = m.data[i].toChar()
-                if (c in '0'..'9' || c in 'A'..'Z') append(c)
-            }
-        }
-        val vin = text.takeLast(17)
-        return vin.takeIf { VinDecoder.isValid(it) }
+        val found = com.odit.obd.vin.VinParser.parse0902(request("0902", 6_000).lines, protocol)
+        return (found.firstOrNull { isEngine(it.ecu) } ?: found.firstOrNull())?.vin
     }
 
     /** ECU names (mode 09 PID 0A) and calibration ids (PID 04), per control unit. */
@@ -324,6 +317,8 @@ class ObdSession(val elm: Elm327, private val log: CommLog) {
     private fun ascii(bytes: List<Int>) = bytes.filter { it in 0x20..0x7E }.joinToString("") { it.toChar().toString() }.trim()
 
     companion object {
+        fun isEngine(header: String): Boolean = header.uppercase() in setOf("7E8", "18DAF110", "10")
+
         /** Friendly name for the sender of an OBD answer. */
         fun ecuName(header: String): String = when (header.uppercase()) {
             "7E8", "18DAF110", "10" -> "Двигател"

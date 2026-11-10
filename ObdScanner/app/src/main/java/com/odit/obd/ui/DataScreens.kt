@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -197,8 +199,9 @@ fun FreezeScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
 }
 
 @Composable
-fun InfoScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
+fun InfoScreen(vm: MainViewModel, snackbar: SnackbarHostState, onExportLog: () -> Unit) {
     val st = vm.info
+    var editVin by remember { mutableStateOf(false) }
     Page(
         title = "Информация",
         busy = vm.busy,
@@ -215,11 +218,23 @@ fun InfoScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
             ) {
                 InfoCard {
                     Text("Автомобил", fontWeight = FontWeight.SemiBold)
-                    KeyValue("VIN", vm.overview.vin ?: "не е наличен")
+                    KeyValue("VIN", vm.overview.vin ?: "не е намерен")
+                    vinOrigin(vm.overview)?.let { KeyValue("Източник", it) }
                     vm.overview.vinInfo?.make?.let { KeyValue("Марка", it) }
                     vm.overview.vinInfo?.year?.let { KeyValue("Моделна година", it.toString()) }
                     KeyValue("Протокол", vm.protocol?.title ?: "—")
+                    TextButton(onClick = { editVin = true }, contentPadding = PaddingValues(0.dp)) {
+                        Text(if (vm.overview.vin == null || vm.overview.vinManual) "Въведи VIN ръчно" else "VIN от автомобила е намерен")
+                    }
                 }
+                val sources = vm.overview.vinReport.found
+                if (sources.size > 1 && !vm.overview.vinReport.conflict) {
+                    InfoCard {
+                        Text("VIN е потвърден от ${sources.size} модула", fontWeight = FontWeight.SemiBold)
+                        for (f in sources) Text(vinSourceText(f), color = Palette.Muted, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                VinConflictCard(vm.overview.vinReport)
                 InfoCard {
                     Text("Адаптер", fontWeight = FontWeight.SemiBold)
                     KeyValue("Версия", vm.adapterVersion.ifBlank { "—" })
@@ -235,6 +250,16 @@ fun InfoScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
                         for (c in id.calibrations) KeyValue("Калибровка", c)
                     }
                 }
+                InfoCard {
+                    Text("Суров лог на комуникацията", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Ако VIN, марката или някоя грешка не се разпознават, изпратете този файл — " +
+                            "съдържа само командите към адаптера и отговорите му.",
+                        color = Palette.Muted,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    TextButton(onClick = onExportLog, contentPadding = PaddingValues(0.dp)) { Text("Експорт на лога") }
+                }
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "Odit OBD чете стандартни OBD-II данни директно от автомобила — не използва база с модели, " +
@@ -245,10 +270,17 @@ fun InfoScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
             }
         }
     }
+    if (editVin) {
+        VinDialog(
+            initial = if (vm.overview.vinManual) vm.overview.vin.orEmpty() else "",
+            onSave = { vm.setManualVin(it) },
+            onDismiss = { editVin = false },
+        )
+    }
 }
 
 @Composable
-fun TerminalScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
+fun TerminalScreen(vm: MainViewModel, snackbar: SnackbarHostState, onExportLog: () -> Unit) {
     val version by vm.log.version.collectAsState()
     val lines = remember(version) { vm.log.snapshot() }
     val listState = rememberLazyListState()
@@ -260,7 +292,10 @@ fun TerminalScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
         busy = vm.busy,
         snackbar = snackbar,
         onBack = { vm.open(Screen.HOME) },
-        actions = { IconButton(onClick = { vm.log.clear() }) { Icon(Icons.Filled.Delete, "Изчисти") } },
+        actions = {
+            IconButton(onClick = onExportLog) { Icon(Icons.Filled.Share, "Експорт на лога") }
+            IconButton(onClick = { vm.log.clear() }) { Icon(Icons.Filled.Delete, "Изчисти") }
+        },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
             Text(

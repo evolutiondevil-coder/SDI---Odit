@@ -14,6 +14,7 @@ fun OditApp(
     withBluetooth: (() -> Unit) -> Unit,
     onShare: (String) -> Unit,
     onSearch: (String) -> Unit,
+    onExportLog: () -> Unit,
 ) {
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(vm.message) {
@@ -43,7 +44,7 @@ fun OditApp(
         Screen.LIVE -> LiveScreen(vm, snackbar)
         Screen.READINESS -> ReadinessScreen(vm, snackbar)
         Screen.FREEZE -> FreezeScreen(vm, snackbar)
-        Screen.INFO -> InfoScreen(vm, snackbar)
-        Screen.TERMINAL -> TerminalScreen(vm, snackbar)
+        Screen.INFO -> InfoScreen(vm, snackbar, onExportLog)
+        Screen.TERMINAL -> TerminalScreen(vm, snackbar, onExportLog)
     }
 }

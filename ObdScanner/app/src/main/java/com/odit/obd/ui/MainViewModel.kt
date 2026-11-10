@@ -31,7 +31,12 @@ import com.odit.obd.obd.Readiness
 import com.odit.obd.obd.VehicleNotRespondingException
 import com.odit.obd.obd.VinDecoder
 import com.odit.obd.obd.VinInfo
+import com.odit.obd.sim.DemoScenario
 import com.odit.obd.sim.SimulatedElm
+import com.odit.obd.vin.VinParser
+import com.odit.obd.vin.VinReader
+import com.odit.obd.vin.VinReport
+import com.odit.obd.BuildConfig
 import com.odit.obd.uds.FoundModule
 import com.odit.obd.uds.ModuleScanner
 import kotlinx.coroutines.CancellationException
@@ -62,6 +67,10 @@ data class Overview(
     val vinInfo: VinInfo? = null,
     val voltage: Double? = null,
     val readiness: Readiness? = null,
+    /** Every VIN the car reported, and from where. */
+    val vinReport: VinReport = VinReport.EMPTY,
+    /** The VIN shown was typed in by the user because the car did not report one. */
+    val vinManual: Boolean = false,
 )
 
 data class DtcUi(
@@ -233,10 +242,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun connectDemo() {
+    fun connectDemo(scenario: DemoScenario = DemoScenario.NORMAL) {
         stopScan()
-        connectWith("демо автомобил", listOf(LinkMode.AUTO), null) { SimulatedElm() }
+        demoScenario = scenario
+        connectWith("демо: ${scenario.title}", listOf(LinkMode.AUTO), null) { SimulatedElm(scenario) }
     }
+
+    private var demoScenario: DemoScenario? = null
 
     private fun transportOrder(device: BluetoothDevice, seenBle: Boolean): List<LinkMode> {
         when (linkMode) {
@@ -337,11 +349,69 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun loadOverview(s: ObdSession) {
-        val voltage = runCatching { s.batteryVoltage() }.getOrNull()
-        val vin = runCatching { s.readVin() }.getOrNull()
-        val r = runCatching { s.readiness() }.getOrNull()
-        overview = Overview(vin, vin?.let { VinDecoder.decode(it) }, voltage, r)
+        val voltage = soft { s.batteryVoltage() }
+        val report = soft { VinReader(s).read(modules.modules) } ?: VinReport.EMPTY
+        val r = soft { s.readiness() }
+        overview = overview.copy(voltage = voltage, readiness = r)
+        applyVin(report)
     }
+
+    /** Runs a read that may fail without stopping the caller; a lost connection still propagates. */
+    private inline fun <T> soft(block: () -> T): T? = try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: TransportException) {
+        throw e
+    } catch (_: Exception) {
+        null
+    }
+
+    /** Key under which per-car data is stored before the garage knows the car. */
+    private val carKey: String
+        get() = if (demo) "demo:${demoScenario?.name}" else (lastDevice?.address ?: "unknown")
+
+    private fun manualVin(): String? = prefs.getString("manualVin:$carKey", null)
+
+    private fun applyVin(report: VinReport) {
+        val manual = manualVin()
+        val vin = report.vin ?: manual
+        overview = overview.copy(
+            vin = vin,
+            vinInfo = vin?.let { VinDecoder.decode(it) },
+            vinReport = report,
+            vinManual = report.vin == null && manual != null,
+        )
+    }
+
+    /** Returns an error text, or null when the VIN was accepted. */
+    fun setManualVin(input: String): String? {
+        val vin = input.trim().uppercase().replace(" ", "")
+        if (vin.isEmpty()) {
+            prefs.edit().remove("manualVin:$carKey").apply()
+            applyVin(overview.vinReport)
+            return null
+        }
+        if (!VinParser.isValidFormat(vin)) {
+            return "VIN трябва да е точно 17 знака: цифри и латински букви без I, O и Q."
+        }
+        prefs.edit().putString("manualVin:$carKey", vin).apply()
+        applyVin(overview.vinReport)
+        return null
+    }
+
+    /** Text of the raw communication log for sharing. */
+    fun exportLog(): String = log.export(
+        linkedMapOf(
+            "app" to "Odit OBD ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+            "exported" to SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date()),
+            "adapter" to listOf(adapterVersion, linkDescription).filter { it.isNotBlank() }.joinToString(" · "),
+            "protocol" to (protocol?.let { "${it.code} ${it.title}" } ?: "—"),
+            "vin" to (overview.vin ?: "—"),
+            "vin-sources" to overview.vinReport.found.joinToString { "${it.ecu}/${it.method.name}=${it.vin}" }.ifEmpty { "—" },
+            "android" to "${android.os.Build.VERSION.RELEASE} (${android.os.Build.MODEL})",
+        ),
+    )
 
     fun refreshOverview() {
         op("Обновяване…") { s -> loadOverview(s) }
@@ -442,15 +512,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val started = op(if (full) "Пълно сканиране на модулите…" else "Сканиране на модулите…",
             onError = { modules = modules.copy(scanning = false, error = it) }) { s ->
             try {
-                if (overview.vin == null) runCatching { s.readVin() }.getOrNull()?.let {
-                    overview = overview.copy(vin = it, vinInfo = VinDecoder.decode(it))
-                }
                 val found = ModuleScanner(s).scan(
                     full, brand,
                     onProgress = { done, total, label -> modules = modules.copy(done = done, total = total, current = label) },
                     onFound = { m -> modules = modules.copy(modules = modules.modules + m) },
                 )
                 modules = modules.copy(scanning = false, finished = true, modules = found)
+                val before = overview.vinReport
+                if (before.vin == null && s.protocol.isCan) {
+                    // The VIN may only be stored in a module the scan just found.
+                    applyVin(soft { VinReader(s).read(found) } ?: VinReader.withModules(before, found))
+                } else {
+                    applyVin(VinReader.withModules(before, found))
+                }
             } finally {
                 if (modules.scanning) modules = modules.copy(scanning = false, finished = true)
             }
@@ -569,11 +643,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun loadInfo() {
         info = info.copy(loading = true, error = null)
         if (!op("Четене на информацията…", onError = { info = Loadable(error = it) }) { s ->
-            val vin = s.readVin()
-            if (vin != null) overview = overview.copy(vin = vin, vinInfo = VinDecoder.decode(vin))
+            applyVin(VinReader(s).read(modules.modules))
             val voltage = s.batteryVoltage()
             if (voltage != null) overview = overview.copy(voltage = voltage)
-            info = Loadable(data = InfoData(vin, s.identities()))
+            info = Loadable(data = InfoData(overview.vin, s.identities()))
         }) info = info.copy(loading = false)
     }
 

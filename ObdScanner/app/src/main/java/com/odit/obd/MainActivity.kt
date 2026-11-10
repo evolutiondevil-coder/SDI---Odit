@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
                     withBluetooth = ::withBluetooth,
                     onShare = ::share,
                     onSearch = ::searchWeb,
+                    onExportLog = ::exportLog,
                 )
             }
         }
@@ -97,6 +98,26 @@ class MainActivity : ComponentActivity() {
             putExtra(Intent.EXTRA_TEXT, text)
         }
         startActivity(Intent.createChooser(send, "Сподели отчета"))
+    }
+
+    private fun exportLog() {
+        try {
+            val dir = java.io.File(cacheDir, "logs").apply { mkdirs() }
+            dir.listFiles()?.forEach { it.delete() } // keep only the latest export
+            val name = "odit-log-" + java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).format(java.util.Date()) + ".txt"
+            val file = java.io.File(dir, name)
+            file.writeText(vm.exportLog())
+            val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.files", file)
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_SUBJECT, "Odit OBD лог")
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(send, "Изпрати лога"))
+        } catch (e: Exception) {
+            vm.message = "Неуспешен експорт: ${e.message}"
+        }
     }
 
     private fun searchWeb(query: String) {

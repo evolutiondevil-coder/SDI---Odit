@@ -14,7 +14,11 @@ import kotlin.math.sin
 class SimulatedElm(
     private val carProtocol: Char = '6',
     private val chunkSize: Int = 20,
+    val scenario: DemoScenario = DemoScenario.NORMAL,
 ) : ObdTransport {
+
+    /** Car for a demo scenario. */
+    constructor(scenario: DemoScenario) : this(if (scenario == DemoScenario.KLINE) '5' else '6', 20, scenario)
 
     override val description = "Демо режим (симулатор)"
 
@@ -39,6 +43,17 @@ class SimulatedElm(
     val enginePermanent = mutableListOf("P0301")
     val tcmStored = mutableListOf("P0741")
 
+    val vin = when (scenario) {
+        DemoScenario.UNKNOWN_WMI -> "Y3MZZZ15ZKA000777"
+        DemoScenario.KLINE -> "VF1BB0A0526123456"
+        else -> "WVWZZZ1KZ8W123456"
+    }
+
+    /** VIN stored in another car's module (conflict scenario). */
+    val otherVin = "WVWZZZ1KZ6W654321"
+
+    private val obdVinSupported = scenario in setOf(DemoScenario.NORMAL, DemoScenario.VIN_CONFLICT, DemoScenario.UNKNOWN_WMI)
+
     private class Module(
         val rx: Int,
         val name: String,
@@ -46,19 +61,26 @@ class SimulatedElm(
         val uds: Boolean = true,
         val kwp: Boolean = false,
         val needsExtendedToClear: Boolean = false,
+        val vin: String? = null,
     )
+
+    private fun moduleVin(tx: Int): String? = when (scenario) {
+        DemoScenario.NORMAL, DemoScenario.UNKNOWN_WMI -> vin
+        DemoScenario.VIN_UDS_ENGINE -> if (tx == 0x7E0) vin else null
+        DemoScenario.VIN_OTHER_MODULE -> if (tx == 0x714) vin else null
+        DemoScenario.VIN_CONFLICT -> if (tx == 0x713) otherVin else vin
+        DemoScenario.KLINE -> null
+    }
 
     private val modules: Map<Int, Module> = mapOf(
-        0x7E0 to Module(0x7E8, "ECM 1.4 TSI", mutableListOf(Triple("P0301", 0x00, 0x2F), Triple("P0171", 0x00, 0x28))),
-        0x7E1 to Module(0x7E9, "DSG 7", mutableListOf(Triple("P0741", 0x00, 0x08))),
-        0x713 to Module(0x77D, "ESP MK100", mutableListOf(Triple("C0035", 0x29, 0x09))),
-        0x715 to Module(0x77F, "Airbag VW", mutableListOf(Triple("B1001", 0x13, 0x08)), needsExtendedToClear = true),
-        0x714 to Module(0x77E, "KOMBI", mutableListOf(Triple("U0121", 0x00, 0x20), Triple("U0155", 0x00, 0x50))),
-        0x70E to Module(0x778, "BCM PQ35", mutableListOf()),
-        0x710 to Module(0x77A, "Gateway", mutableListOf(Triple("U0100", 0x00, 0x08)), uds = false, kwp = true),
+        0x7E0 to Module(0x7E8, "ECM 1.4 TSI", mutableListOf(Triple("P0301", 0x00, 0x2F), Triple("P0171", 0x00, 0x28)), vin = moduleVin(0x7E0)),
+        0x7E1 to Module(0x7E9, "DSG 7", mutableListOf(Triple("P0741", 0x00, 0x08)), vin = moduleVin(0x7E1)),
+        0x713 to Module(0x77D, "ESP MK100", mutableListOf(Triple("C0035", 0x29, 0x09)), vin = moduleVin(0x713)),
+        0x715 to Module(0x77F, "Airbag VW", mutableListOf(Triple("B1001", 0x13, 0x08)), needsExtendedToClear = true, vin = moduleVin(0x715)),
+        0x714 to Module(0x77E, "KOMBI", mutableListOf(Triple("U0121", 0x00, 0x20), Triple("U0155", 0x00, 0x50)), vin = moduleVin(0x714)),
+        0x70E to Module(0x778, "BCM PQ35", mutableListOf(), vin = moduleVin(0x70E)),
+        0x710 to Module(0x77A, "Gateway", mutableListOf(Triple("U0100", 0x00, 0x08)), uds = false, kwp = true, vin = moduleVin(0x710)),
     )
-
-    val vin = "WVWZZZ1KZ8W123456"
 
     private val supportedPids = setOf(
         0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x13, 0x14, 0x15, 0x1C,
@@ -148,6 +170,7 @@ class SimulatedElm(
         val answers: List<Pair<Int, IntArray>> = when {
             carProtocol == '6' && header == 0x7DF -> obdFunctional(req)
             carProtocol == '6' -> physical(header, req)
+            header == 0x8110F1 -> kLinePhysical(req)
             else -> obdFunctional(req)
         }
         if (answers.isEmpty()) return prefix + "NO DATA"
@@ -187,7 +210,7 @@ class SimulatedElm(
                 intArrayOf(0x44)
             }
             0x09 -> when (req.getOrNull(1)) {
-                0x02 -> intArrayOf(0x49, 0x02, 0x01) + vin.map { it.code }.toIntArray()
+                0x02 -> if (obdVinSupported) intArrayOf(0x49, 0x02, 0x01) + vin.map { it.code }.toIntArray() else null
                 0x04 -> intArrayOf(0x49, 0x04, 0x01) + pad("03C906056DT", 16)
                 0x0A -> intArrayOf(0x49, 0x0A, 0x01) + pad("ECM-EngineControl", 20)
                 else -> null
@@ -268,6 +291,14 @@ class SimulatedElm(
         else -> null
     }
 
+    /** K-line KWP2000 physical request to the engine (address 0x10). */
+    private fun kLinePhysical(req: IntArray): List<Pair<Int, IntArray>> = when {
+        scenario == DemoScenario.KLINE && req.size >= 2 && req[0] == 0x1A && req[1] == 0x90 ->
+            listOf(0x7E8 to (intArrayOf(0x5A, 0x90) + vin.map { it.code }.toIntArray()))
+        req.isNotEmpty() -> listOf(0x7E8 to intArrayOf(0x7F, req[0], 0x11))
+        else -> emptyList()
+    }
+
     /** Physical (module) addressing: UDS / KWP requests. */
     private fun physical(tx: Int, req: IntArray): List<Pair<Int, IntArray>> {
         val m = modules[tx] ?: return emptyList()
@@ -304,6 +335,10 @@ class SimulatedElm(
             sid == 0x10 && req.size >= 2 -> { session = req[1]; intArrayOf(0x50, req[1], 0x00, 0x32, 0x01, 0xF4) }
             sid == 0x22 && req.size >= 3 && req[1] == 0xF1 && req[2] == 0x97 && m.uds ->
                 intArrayOf(0x62, 0xF1, 0x97) + m.name.map { it.code }.toIntArray()
+            sid == 0x22 && req.size >= 3 && req[1] == 0xF1 && req[2] == 0x90 && m.uds ->
+                m.vin?.let { intArrayOf(0x62, 0xF1, 0x90) + it.map { c -> c.code }.toIntArray() } ?: intArrayOf(0x7F, 0x22, 0x31)
+            sid == 0x1A && m.kwp && req.getOrNull(1) == 0x90 ->
+                m.vin?.let { intArrayOf(0x5A, 0x90) + it.map { c -> c.code }.toIntArray() } ?: intArrayOf(0x7F, 0x1A, 0x31)
             sid == 0x1A && m.kwp -> intArrayOf(0x5A, 0x9B) + m.name.map { it.code }.toIntArray()
             sid == 0x22 -> intArrayOf(0x7F, 0x22, 0x31)
             tx == 0x7E0 -> engine(req) ?: return emptyList()
@@ -322,6 +357,10 @@ class SimulatedElm(
             val lines = mutableListOf<String>()
             val chunks = if (payload[0] == 0x43 || payload[0] == 0x47) {
                 payload.drop(1).chunked(6).map { listOf(payload[0]) + it }
+            } else if (payload.size > 3 && payload[0] == 0x49 && payload[1] == 0x02) {
+                // SAE J1979 non-CAN: 5 messages "49 02 <n> b b b b", the first padded with three zeros.
+                val chars = listOf(0, 0, 0) + payload.drop(3)
+                chars.chunked(4).mapIndexed { i, part -> listOf(0x49, 0x02, i + 1) + part }
             } else {
                 listOf(payload.toList())
             }

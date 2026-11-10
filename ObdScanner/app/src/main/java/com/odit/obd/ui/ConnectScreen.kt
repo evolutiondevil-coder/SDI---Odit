@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +26,13 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import com.odit.obd.sim.DemoScenario
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -33,6 +41,29 @@ import com.odit.obd.bt.FoundDevice
 
 @Composable
 fun ConnectScreen(vm: MainViewModel, snackbar: SnackbarHostState, withBluetooth: (() -> Unit) -> Unit) {
+    var pickDemo by remember { mutableStateOf(false) }
+    if (pickDemo) {
+        AlertDialog(
+            onDismissRequest = { pickDemo = false },
+            title = { Text("Демо автомобил") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    for (sc in DemoScenario.entries) {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { pickDemo = false; vm.connectDemo(sc) }
+                                .padding(vertical = 8.dp),
+                        ) {
+                            Text(sc.title, fontWeight = FontWeight.SemiBold)
+                            Text(sc.description, color = Palette.Muted, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { pickDemo = false }) { Text("Отказ") } },
+        )
+    }
     Page(title = "Odit OBD", busy = null, snackbar = snackbar, onBack = null) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -124,7 +155,7 @@ fun ConnectScreen(vm: MainViewModel, snackbar: SnackbarHostState, withBluetooth:
             }
 
             item {
-                TextButton(onClick = { vm.connectDemo() }, modifier = Modifier.fillMaxWidth()) {
+                TextButton(onClick = { pickDemo = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Демо режим (без автомобил)")
                 }
             }

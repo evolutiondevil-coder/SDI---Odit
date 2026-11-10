@@ -7,6 +7,9 @@ import com.odit.obd.obd.ClearResult
 import com.odit.obd.obd.Dtc
 import com.odit.obd.obd.DtcKind
 import com.odit.obd.obd.ObdSession
+import com.odit.obd.vin.VinFound
+import com.odit.obd.vin.VinMethod
+import com.odit.obd.vin.VinParser
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -26,6 +29,8 @@ data class FoundModule(
     val type: DiagType?,
     val dtcs: List<Dtc>,
     val readError: String?,
+    /** VIN stored in this module (UDS 22 F190 / KWP 1A 90), if it reports one. */
+    val vin: String? = null,
 ) {
     val addressLabel: String get() = if (is29) "18DA%02XF1".format(tx) else "0x%03X".format(tx)
 
@@ -213,9 +218,49 @@ class ModuleScanner(private val s: ObdSession) {
             null -> null
         }?.takeIf { it.isNotBlank() }
 
+        val vin = when (type) {
+            DiagType.UDS -> readVinFrom(tx, DiagType.UDS)
+            DiagType.KWP -> readVinFrom(tx, DiagType.KWP)
+            null -> null
+        }
+
         val name = catalogName
             ?: (if (s.protocol.is29bit) ModuleCatalog.name29(tx) else ModuleCatalog.nameFor(brand, tx))
-        return FoundModule(tx, rx, s.protocol.is29bit, header, name, ident, type, dtcs, error)
+        return FoundModule(tx, rx, s.protocol.is29bit, header, name, ident, type, dtcs, error, vin)
+    }
+
+    private suspend fun readVinFrom(tx: Int, type: DiagType): String? = if (type == DiagType.UDS) {
+        exchange(tx, "22F190", 0x22)?.let { VinParser.parseUdsF190(it.data) }
+    } else {
+        exchange(tx, "1A90", 0x1A)?.let { VinParser.parseKwp1A90(it.data) }
+    }
+
+    /** A module to ask for its VIN with physical addressing. */
+    data class VinTarget(val tx: Int, val rx: Int, val type: DiagType)
+
+    /**
+     * Asks the given modules for their VIN (UDS 22 F190, or KWP 1A 90), in order.
+     * With [stopAtFirst] it stops as soon as one valid VIN is found.
+     */
+    suspend fun readVins(targets: List<VinTarget>, stopAtFirst: Boolean): List<VinFound> {
+        if (!s.protocol.isCan) return emptyList()
+        val out = mutableListOf<VinFound>()
+        try {
+            prepare()
+            for (t in targets) {
+                currentCoroutineContext().ensureActive()
+                select(t.tx, t.rx)
+                val answer = if (t.type == DiagType.UDS) exchange(t.tx, "22F190", 0x22) else exchange(t.tx, "1A90", 0x1A)
+                val vin = answer?.let { if (t.type == DiagType.UDS) VinParser.parseUdsF190(it.data) else VinParser.parseKwp1A90(it.data) }
+                if (answer != null && vin != null) {
+                    out += VinFound(vin, answer.header, if (t.type == DiagType.UDS) VinMethod.UDS_F190 else VinMethod.KWP_1A90)
+                    if (stopAtFirst) break
+                }
+            }
+        } finally {
+            withContext(NonCancellable) { runCatching { s.restoreObdDefaults() } }
+        }
+        return out
     }
 
     private suspend fun readUdsIdent(tx: Int): String? {

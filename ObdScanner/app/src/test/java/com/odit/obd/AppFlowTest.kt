@@ -83,6 +83,9 @@ class AppFlowTest {
         shot("01_connect")
 
         click("Демо режим (без автомобил)")
+        waitForText("Обикновен автомобил")
+        compose.onNodeWithText("Обикновен автомобил").performClick()
+        pump()
         waitForText("Volkswagen")
         waitWhileBusy("Четене на данни")
         shot("02_home")

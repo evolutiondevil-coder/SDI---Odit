@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Row
@@ -50,6 +51,7 @@ import java.util.Locale
 fun HomeScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
     var confirmClear by remember { mutableStateOf(false) }
     var confirmExit by remember { mutableStateOf(false) }
+    var editVin by remember { mutableStateOf(false) }
 
     Page(
         title = if (vm.demo) "Автомобил (демо)" else "Автомобил",
@@ -73,7 +75,8 @@ fun HomeScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            VehicleCard(vm)
+            VehicleCard(vm, onEditVin = { editVin = true })
+            VinConflictCard(vm.overview.vinReport)
 
             vm.vehicleError?.let { err ->
                 InfoCard(color = Palette.Warn.copy(alpha = 0.15f)) {
@@ -113,6 +116,13 @@ fun HomeScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
         }
     }
 
+    if (editVin) {
+        VinDialog(
+            initial = if (vm.overview.vinManual) vm.overview.vin.orEmpty() else "",
+            onSave = { vm.setManualVin(it) },
+            onDismiss = { editVin = false },
+        )
+    }
     if (confirmClear) ClearDialog(onConfirm = { confirmClear = false; vm.clearDtcs() }, onDismiss = { confirmClear = false })
     if (confirmExit) {
         AlertDialog(
@@ -143,13 +153,23 @@ fun ClearDialog(title: String = "Изтриване на грешките?", onC
 }
 
 @Composable
-private fun VehicleCard(vm: MainViewModel) {
+private fun VehicleCard(vm: MainViewModel, onEditVin: () -> Unit) {
     val o = vm.overview
     InfoCard {
         val title = o.vinInfo?.let { listOfNotNull(it.make, it.year?.toString()).joinToString(" · ") }
             ?.ifBlank { null } ?: if (vm.vehicleReady) "Автомобил" else "Адаптерът е свързан"
         Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        o.vin?.let { KeyValue("VIN", it) }
+        if (o.vin != null) {
+            KeyValue("VIN", o.vin)
+            vinOrigin(o)?.let { KeyValue("", it) }
+        } else if (vm.vehicleReady && vm.busy == null) {
+            KeyValue("VIN", "не е намерен")
+        }
+        if (vm.vehicleReady && vm.busy == null && (o.vin == null || o.vinManual)) {
+            TextButton(onClick = onEditVin, contentPadding = PaddingValues(0.dp)) {
+                Text(if (o.vin == null) "Въведи VIN ръчно" else "Промени ръчно въведения VIN")
+            }
+        }
         vm.protocol?.let { KeyValue("Протокол", it.title) }
         KeyValue("Адаптер", listOf(vm.adapterVersion, vm.linkDescription).filter { it.isNotBlank() }.joinToString(" · "))
         o.voltage?.let { v ->
