@@ -18,13 +18,28 @@ data class Dtc(
     val kind: DtcKind = DtcKind.STORED,
     val ftb: Int? = null,
     val status: Int? = null,
+    /**
+     * The manufacturer's own numbering, read from an old K-line unit: [code] is the bytes in hex and
+     * must not be read as a standard P/C/B/U code.
+     */
+    val raw: Boolean = false,
 ) {
-    val displayCode: String get() = if (ftb != null && ftb != 0) "%s-%02X".format(code, ftb) else code
+    val displayCode: String
+        get() = when {
+            raw -> "DTC $code"
+            ftb != null && ftb != 0 -> "%s-%02X".format(code, ftb)
+            else -> code
+        }
 
-    val description: String get() = DtcDatabase.describe(code)
+    val description: String
+        get() = if (raw) {
+            "Код на производителя от стар модул (K-line). Значението зависи от марката и модула — потърсете го с бутона по-долу."
+        } else {
+            DtcDatabase.describe(code)
+        }
 
     /** Set when the description comes from a manufacturer pack (shown under the text). */
-    val descriptionSource: String? get() = DtcDatabase.lookup(code).source
+    val descriptionSource: String? get() = if (raw) null else DtcDatabase.lookup(code).source
 
     val ftbDescription: String? get() = ftb?.takeIf { it != 0 }?.let { DtcDatabase.failureType(it) }
 

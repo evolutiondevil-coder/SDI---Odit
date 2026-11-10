@@ -1,6 +1,6 @@
 {
  "id": "vin-rules",
- "version": 1,
+ "version": 2,
  "schema": 1,
  "title": "Правила за модел и година по VIN",
  "sources": [
@@ -15,6 +15,12 @@
    "url": "https://en.wikipedia.org/wiki/Vehicle_identification_number",
    "license": "CC BY-SA 4.0",
    "retrieved": "2026-11-10"
+  },
+  {
+   "name": "Renault/Dacia: кодове BM/CM/KM, BZ/KZ/DZ/EZ, HS и годините на поколенията са от статиите в Wikipedia; останалите кодове на Renault/Dacia са по опит и НЕ са сверени с документация",
+   "url": "https://en.wikipedia.org/wiki/Renault_Mégane",
+   "license": "CC BY-SA 4.0",
+   "retrieved": "2026-11-10"
   }
  ],
  "data": {
@@ -25,8 +31,8 @@
   },
   "default": {
    "pos": 10,
-   "policy": "probable",
-   "note": "При много европейски производители позиция 10 не е годината — проверете в талона."
+   "policy": "none",
+   "note": "При тази марка годината не може да се определи сигурно от VIN — вижте талона и я въведете от „Поправи данните“."
   },
   "maps": {
    "vw": {
@@ -218,6 +224,82 @@
     "S": "Galaxy / S-Max / Escort",
     "W": "Galaxy / S-Max / Escort",
     "U": "Maverick"
+   },
+   "renault": {
+    "BM": "Mégane II",
+    "CM": "Mégane II",
+    "KM": "Mégane II (комби)",
+    "BZ": "Mégane III",
+    "KZ": "Mégane III (комби)",
+    "DZ": "Mégane III (купе)",
+    "EZ": "Mégane III (кабрио)",
+    "LM": "Mégane II (седан)",
+    "EM": "Mégane II (кабрио)",
+    "JM": "Scénic II",
+    "JZ": "Scénic III",
+    "BA": "Mégane I",
+    "DA": "Mégane I (купе)",
+    "EA": "Mégane I (кабрио)",
+    "KA": "Mégane I (комби)",
+    "LA": "Mégane I (седан)",
+    "JA": "Scénic I",
+    "BB": "Clio II",
+    "CB": "Clio II",
+    "SB": "Clio II (товарен)",
+    "LB": "Thalia / Symbol",
+    "BR": "Clio III",
+    "CR": "Clio III",
+    "KR": "Clio III (комби)",
+    "5R": "Clio IV",
+    "2R": "Captur I",
+    "BG": "Laguna II",
+    "KG": "Laguna II (комби)",
+    "BT": "Laguna III",
+    "KT": "Laguna III (комби)",
+    "DT": "Laguna III (купе)",
+    "KC": "Kangoo I",
+    "FC": "Kangoo I (товарен)",
+    "KW": "Kangoo II",
+    "FW": "Kangoo II (товарен)",
+    "JP": "Modus",
+    "JK": "Espace IV"
+   },
+   "renault-years": {
+    "BM": "2002–2008",
+    "CM": "2002–2008",
+    "KM": "2002–2008",
+    "LM": "2002–2008",
+    "EM": "2002–2008",
+    "BZ": "2008–2016",
+    "KZ": "2008–2016",
+    "DZ": "2008–2016",
+    "EZ": "2008–2016",
+    "JM": "2003–2009",
+    "JZ": "2009–2016",
+    "BA": "1995–2003",
+    "DA": "1995–2003",
+    "EA": "1995–2003",
+    "KA": "1995–2003",
+    "LA": "1995–2003",
+    "JA": "1996–2003",
+    "BB": "1998–2012",
+    "CB": "1998–2012",
+    "SB": "1998–2012",
+    "BR": "2005–2012",
+    "CR": "2005–2012",
+    "KR": "2005–2012",
+    "5R": "2012–2020"
+   },
+   "dacia": {
+    "LS": "Logan I",
+    "KS": "Logan MCV I",
+    "BS": "Sandero I",
+    "HS": "Duster I"
+   },
+   "dacia-years": {
+    "LS": "2004–2012",
+    "BS": "2008–2012",
+    "HS": "2010–2017"
    }
   },
   "makes": {
@@ -384,6 +466,182 @@
       "code": "9",
       "label": "код",
       "map": "ford-eu"
+     }
+    ]
+   },
+   "Volvo": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (по описанието за тази марка в Wikibooks)."
+     }
+    ]
+   },
+   "Hyundai": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (по описанието за тази марка в Wikibooks)."
+     }
+    ]
+   },
+   "Kia": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (по описанието за тази марка в Wikibooks)."
+     }
+    ]
+   },
+   "Honda": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (по описанието за тази марка в Wikibooks)."
+     }
+    ]
+   },
+   "Land Rover": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (по описанието за тази марка в Wikibooks)."
+     }
+    ]
+   },
+   "Porsche": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (по описанието за тази марка в Wikibooks)."
+     }
+    ]
+   },
+   "Saab": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (по описанието за тази марка в Wikibooks)."
+     }
+    ]
+   },
+   "Mazda": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (по описанието за тази марка в Wikibooks)."
+     }
+    ]
+   },
+   "Mitsubishi": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (по описанието за тази марка в Wikibooks)."
+     }
+    ]
+   },
+   "Nissan": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (по описанието за тази марка в Wikibooks)."
+     }
+    ]
+   },
+   "Toyota": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (по описанието за тази марка в Wikibooks)."
+     }
+    ]
+   },
+   "Lexus": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (по описанието за тази марка в Wikibooks)."
+     }
+    ]
+   },
+   "Fiat": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (по описанието за тази марка в Wikibooks)."
+     }
+    ]
+   },
+   "Alfa Romeo": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (по описанието за тази марка в Wikibooks)."
+     }
+    ]
+   },
+   "Opel": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (непроверено в документация)."
+     }
+    ]
+   },
+   "Vauxhall": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "Позиция 10 обикновено е моделната година (непроверено в документация)."
+     }
+    ]
+   },
+   "Renault": {
+    "years": [
+     {
+      "policy": "none",
+      "note": "При Renault и Dacia позиция 10 е част от серийния номер, а не годината — затова тя не се показва от VIN."
+     }
+    ],
+    "models": [
+     {
+      "code": "4-5",
+      "label": "код",
+      "map": "renault",
+      "years": "renault-years"
+     }
+    ]
+   },
+   "Dacia": {
+    "years": [
+     {
+      "policy": "none",
+      "note": "При Renault и Dacia позиция 10 е част от серийния номер, а не годината — затова тя не се показва от VIN."
+     }
+    ],
+    "models": [
+     {
+      "code": "4-5",
+      "label": "код",
+      "map": "dacia",
+      "years": "dacia-years"
      }
     ]
    }

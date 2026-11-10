@@ -42,6 +42,8 @@ data class CarRecord(
     val modules: List<SavedModule> = emptyList(),
     val history: List<ScanRecord> = emptyList(),
     val lastSeen: Long = System.currentTimeMillis(),
+    /** The VIN was typed by the user because the car did not report one. */
+    val vinManual: Boolean = false,
 ) {
     companion object {
         fun idForVin(vin: String) = "vin-$vin"
@@ -131,6 +133,7 @@ class Garage(private val dir: File) {
                 })
             })
             put("lastSeen", c.lastSeen)
+            if (c.vinManual) put("vinManual", true)
         }
 
         private fun JSONObject.str(k: String): String? = if (has(k) && !isNull(k)) getString(k) else null
@@ -164,6 +167,7 @@ class Garage(private val dir: File) {
                     ScanRecord(h.getLong("time"), h.getString("kind"), (0 until codes.length()).map { codes.getString(it) }, h.str("note"))
                 },
                 lastSeen = o.optLong("lastSeen"),
+                vinManual = o.optBoolean("vinManual"),
             )
         }
 

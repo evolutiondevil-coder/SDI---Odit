@@ -60,6 +60,21 @@ object ModuleCatalog {
         ),
     )
 
+    /** K-line addresses per make group from the "modules" pack. */
+    @Volatile var packKLine: Map<String, List<KLineTarget>> = emptyMap()
+
+    private val builtInKLine: Map<String, List<KLineTarget>> = mapOf(
+        // 0x7A is the address Renault's own tools use for the engine (injection) unit.
+        "RENAULT_NISSAN" to listOf(KLineTarget(0x7A, "Двигател (впръскване)")),
+        "ANY" to listOf(KLineTarget(0x10, null), KLineTarget(0x11, null), KLineTarget(0x7A, null)),
+    )
+
+    /** Control units to try on the K-line for this make (the generic list when the make is unknown). */
+    fun kLineTargets(brand: Brand): List<KLineTarget> {
+        val source = packKLine.ifEmpty { builtInKLine }
+        return source[brand.name] ?: source["ANY"].orEmpty()
+    }
+
     /** Addresses for the quick scan: everything known for every make, plus the OBD range. */
     fun quickList(brand: Brand): List<ModuleAddress> {
         val result = LinkedHashMap<Int, ModuleAddress>()

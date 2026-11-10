@@ -58,7 +58,11 @@ class OnlineTest {
         assertEquals("BMW", bmw.make?.value)
         assertEquals(Confidence.CERTAIN, bmw.make?.confidence)       // the WMI table already knew it
         assertEquals(Confidence.ONLINE, bmw.model?.confidence)       // filled from vPIC
-        assertEquals(Confidence.PROBABLE, bmw.year?.confidence)      // offline rule kept, not replaced
+        // vPIC recognised the model, so its year is from a matching US pattern and can be shown (as online).
+        assertEquals(2014, bmw.year?.value)
+        assertEquals(Confidence.ONLINE, bmw.year?.confidence)
+        // A year without a recognised model is just position 10 read blindly (wrong for Renault): ignored.
+        assertNull(decoder.decode("VF15R0G0H41234567", online = OnlineInfo("nhtsa-vpic", 1L, "Renault", null, 2004, null, null)).year)
         // VW: the offline model stays, the online one is ignored.
         val vw = decoder.decode("WVWZZZ1KZ8W123456", online = OnlineInfo("x", 1L, "Volkswagen", "Rabbit", 2008, null, null))
         assertEquals("Golf V / Jetta V", vw.model?.value)

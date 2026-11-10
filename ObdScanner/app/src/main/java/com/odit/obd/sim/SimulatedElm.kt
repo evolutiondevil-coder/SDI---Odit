@@ -4,6 +4,7 @@ import com.odit.obd.bt.ObdTransport
 import com.odit.obd.obd.Dtc
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.delay
 import kotlin.math.sin
 
 /**
@@ -18,7 +19,14 @@ class SimulatedElm(
 ) : ObdTransport {
 
     /** Car for a demo scenario. */
-    constructor(scenario: DemoScenario) : this(if (scenario == DemoScenario.KLINE) '5' else '6', 20, scenario)
+    constructor(scenario: DemoScenario) : this(
+        when (scenario) {
+            DemoScenario.KLINE -> '5'
+            DemoScenario.OLD_RENAULT -> 'X' // no OBD2 protocol at all
+            else -> '6'
+        },
+        20, scenario,
+    )
 
     override val description = "Демо режим (симулатор)"
 
@@ -46,13 +54,15 @@ class SimulatedElm(
     val vin = when (scenario) {
         DemoScenario.UNKNOWN_WMI -> "Y3MZZZ15ZKA000777"
         DemoScenario.KLINE -> "VF1BB0A0526123456"
+        DemoScenario.OLD_RENAULT -> "VF1JA0B0521234567"
         else -> "WVWZZZ1KZ8W123456"
     }
 
     /** VIN stored in another car's module (conflict scenario). */
     val otherVin = "WVWZZZ1KZ6W654321"
 
-    private val obdVinSupported = scenario in setOf(DemoScenario.NORMAL, DemoScenario.VIN_CONFLICT, DemoScenario.UNKNOWN_WMI)
+    private val obdVinSupported =
+        scenario in setOf(DemoScenario.NORMAL, DemoScenario.VIN_CONFLICT, DemoScenario.UNKNOWN_WMI, DemoScenario.ACTIVE_FAULT)
 
     private class Module(
         val rx: Int,
@@ -69,7 +79,54 @@ class SimulatedElm(
         DemoScenario.VIN_UDS_ENGINE -> if (tx == 0x7E0) vin else null
         DemoScenario.VIN_OTHER_MODULE -> if (tx == 0x714) vin else null
         DemoScenario.VIN_CONFLICT -> if (tx == 0x713) otherVin else vin
-        DemoScenario.KLINE -> null
+        DemoScenario.KLINE, DemoScenario.OLD_RENAULT -> null
+        DemoScenario.ACTIVE_FAULT -> vin
+    }
+
+    // ------------------------------------------------- old car: K-line units with physical addressing
+    private class KUnit(val ident: String, val dtcs: MutableList<Triple<Int, Int, Int>>, val vin: String?)
+
+    private val kUnits: Map<Int, KUnit> = mapOf(
+        0x7A to KUnit("SIEMENS SIRIUS32 7700112233", mutableListOf(Triple(0x01, 0x20, 0xA1), Triple(0x03, 0x35, 0x21)), vin),
+        0x2C to KUnit("AUTOLIV AB8.0", mutableListOf(Triple(0x00, 0x15, 0x81)), null),
+        0x26 to KUnit("UCH N2", mutableListOf(), vin),
+    )
+
+    /** Address of the unit woken up by the last init, if any. */
+    private var kOpen: Int? = null
+
+    /** Time the answer being prepared would take on a real adapter. */
+    private var pendingDelayMs = 0L
+
+    private fun kAddress(): Int? = if ((header shr 16) == 0x81 && selected in "45") (header shr 8) and 0xFF else null
+
+    private fun oldCar(req: IntArray): List<String> {
+        val addr = kAddress() ?: return when (selected) {
+            '0' -> { pendingDelayMs = 3_000; listOf("SEARCHING...", "UNABLE TO CONNECT") }
+            '3', '4' -> { pendingDelayMs = 2_600; listOf("BUS INIT: ...ERROR") } // 5-baud address takes 2 s
+            '5' -> { pendingDelayMs = 400; listOf("BUS INIT: ...ERROR") }
+            '6', '7', '8', '9' -> listOf("CAN ERROR")
+            else -> listOf("NO DATA")
+        }
+        val unit = kUnits[addr] ?: return listOf("BUS INIT: ...ERROR")
+        val prefix = if (kOpen != addr) { kOpen = addr; listOf("BUS INIT: OK") } else emptyList()
+        val sid = req[0]
+        val answer: IntArray = when {
+            sid == 0x10 && req.getOrNull(1) == 0xC0 -> intArrayOf(0x50, 0xC0)
+            sid == 0x10 -> intArrayOf(0x7F, 0x10, 0x12)
+            sid == 0x3E -> intArrayOf(0x7E)
+            sid == 0x21 && req.getOrNull(1) == 0x80 -> intArrayOf(0x61, 0x80, 0x00) + unit.ident.map { it.code }.toIntArray()
+            sid == 0x21 && req.getOrNull(1) == 0x81 ->
+                unit.vin?.let { intArrayOf(0x61, 0x81) + it.map { c -> c.code }.toIntArray() } ?: intArrayOf(0x7F, 0x21, 0x12)
+            sid == 0x17 -> intArrayOf(0x57, unit.dtcs.size) + unit.dtcs.flatMap { listOf(it.first, it.second, it.third) }.toIntArray()
+            sid == 0x14 -> { unit.dtcs.clear(); intArrayOf(0x54, 0xFF, 0x00) }
+            else -> intArrayOf(0x7F, sid, 0x11)
+        }
+        // ISO 14230 frame: format (+length), target, source, data, checksum.
+        val head = if (answer.size <= 63) listOf(0x80 or answer.size, 0xF1, addr) else listOf(0x80, 0xF1, addr, answer.size)
+        val frame = head + answer.toList()
+        val line = if (headers) hex(frame + (frame.sum() and 0xFF)) else hex(answer.toList())
+        return prefix + line
     }
 
     private val modules: Map<Int, Module> = mapOf(
@@ -98,7 +155,12 @@ class SimulatedElm(
             input.delete(0, idx + 1)
             val out = StringBuilder()
             if (echo) out.append(cmd).append('\r')
-            for (line in handle(cmd.trim())) out.append(line).append('\r')
+            val lines = handle(cmd.trim())
+            // A real adapter needs time to try to wake a K-line unit up before it gives up.
+            val wait = pendingDelayMs
+            pendingDelayMs = 0
+            if (wait > 0) delay(wait)
+            for (line in lines) out.append(line).append('\r')
             out.append('\r').append('>')
             val bytes = out.toString().toByteArray(Charsets.ISO_8859_1)
             var i = 0
@@ -137,9 +199,19 @@ class SimulatedElm(
         c == "H1" -> { headers = true; listOf("OK") }
         c == "RV" -> listOf("12.6V")
         c == "DPN" -> listOf(if (selected == '0') "A$carProtocol" else "$selected")
+        c == "FI" -> {
+            val addr = kAddress()
+            if (scenario == DemoScenario.OLD_RENAULT && selected == '5' && addr != null && addr in kUnits) {
+                kOpen = addr
+                listOf("BUS INIT: OK")
+            } else {
+                listOf("BUS INIT: ...ERROR")
+            }
+        }
+        c == "SI" -> listOf("BUS INIT: ...ERROR")
         c.startsWith("SPA") -> { selected = '0'; detected = false; listOf("OK") }
         c.startsWith("SP") || c.startsWith("TP") -> {
-            selected = c.last(); detected = false; listOf("OK")
+            selected = c.last(); detected = false; kOpen = null; listOf("OK")
         }
         c.startsWith("SH") -> {
             val h = c.substring(2)
@@ -148,18 +220,20 @@ class SimulatedElm(
         }
         c.startsWith("CRA") || c.startsWith("CF") || c.startsWith("CM") || c.startsWith("FC") ||
             c.startsWith("ST") || c.startsWith("CP") || c.startsWith("AT") || c.startsWith("L") ||
-            c.startsWith("D0") || c.startsWith("D1") || c.startsWith("CAF") -> listOf("OK")
+            c.startsWith("D0") || c.startsWith("D1") || c.startsWith("CAF") || c.startsWith("SW") ||
+            c.startsWith("WM") || c.startsWith("IB") || c.startsWith("IIA") -> listOf("OK")
         else -> listOf("?")
     }
 
     private fun reset() {
         echo = true; spaces = true; headers = false; header = 0x7DF; session = 1
-        selected = '0'; detected = false
+        selected = '0'; detected = false; kOpen = null
     }
 
     // -------------------------------------------------------------------- car
 
     private fun obd(req: IntArray): List<String> {
+        if (scenario == DemoScenario.OLD_RENAULT) return oldCar(req)
         val prefix = mutableListOf<String>()
         if (!detected) {
             if (selected == '0') prefix += "SEARCHING..."
@@ -207,6 +281,8 @@ class SimulatedElm(
             0x0A -> dtcPayload(0x0A, enginePermanent)
             0x04 -> {
                 engineStored.clear(); enginePending.clear(); tcmStored.clear()
+                // A fault that is present right now is detected again at once.
+                if (scenario == DemoScenario.ACTIVE_FAULT) engineStored += "P0301"
                 intArrayOf(0x44)
             }
             0x09 -> when (req.getOrNull(1)) {

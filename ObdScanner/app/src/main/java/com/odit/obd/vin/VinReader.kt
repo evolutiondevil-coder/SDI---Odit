@@ -84,7 +84,12 @@ class VinReader(private val s: ObdSession) {
             for (m in modules) {
                 val v = m.vin ?: continue
                 if (found.none { it.ecu == m.responseHeader && it.vin == v }) {
-                    found += VinFound(v, m.responseHeader, if (m.type == DiagType.KWP) VinMethod.KWP_1A90 else VinMethod.UDS_F190)
+                    val method = when (m.type) {
+                        DiagType.KWP -> VinMethod.KWP_1A90
+                        DiagType.KLINE -> VinMethod.KLINE
+                        else -> VinMethod.UDS_F190
+                    }
+                    found += VinFound(v, m.responseHeader, method)
                 }
             }
             return VinReport(choose(found), found)

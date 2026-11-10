@@ -12,6 +12,9 @@ import java.io.IOException
 
 class VehicleNotRespondingException(message: String) : IOException(message)
 
+/** What the adapter answered when one protocol was tried, and how long its first answer took. */
+data class ProtocolAttempt(val protocol: ObdProtocol, val answer: String, val ms: Long)
+
 /** The answer to one OBD/UDS request, already split per control unit. */
 class ObdReply(val lines: List<String>, val messages: List<EcuMessage>, val error: String?) {
     fun positive(service: Int): List<EcuMessage> =
@@ -33,7 +36,12 @@ data class EcuIdentity(val ecu: String, val name: String?, val calibrations: Lis
  * Talks standard OBD-II (SAE J1979) through an ELM327 adapter.
  * Nothing here depends on the make or model: the car is asked directly, so no VIN lookup is needed.
  */
-class ObdSession(val elm: Elm327, private val log: CommLog) {
+class ObdSession(
+    val elm: Elm327,
+    private val log: CommLog,
+    /** Monotonic time in ms (the app passes the system's elapsed-time clock). */
+    private val clock: () -> Long = System::currentTimeMillis,
+) {
 
     var protocol: ObdProtocol = ObdProtocol.AUTO
         private set
@@ -44,6 +52,14 @@ class ObdSession(val elm: Elm327, private val log: CommLog) {
 
     /** Set by the module scanner when it changed headers/filters; restored before the next OBD request. */
     internal var adapterDirty = false
+
+    /** Set when K-line physical addressing changed the header, wake-up message and protocol. */
+    internal var kLineDirty = false
+
+    /** Every protocol tried by the last [connectVehicle], for the "why did it not connect" diagnosis. */
+    var attempts: List<ProtocolAttempt> = emptyList()
+        private set
+    private val attemptLog = mutableListOf<ProtocolAttempt>()
 
     private var supportedCache: Set<Int>? = null
 
@@ -76,53 +92,78 @@ class ObdSession(val elm: Elm327, private val log: CommLog) {
     suspend fun connectVehicle(preferred: ObdProtocol?, progress: (String) -> Unit): ObdProtocol {
         vehicleConnected = false
         supportedCache = null
+        attemptLog.clear()
+        attempts = emptyList()
         val tried = mutableSetOf<ObdProtocol>()
+        try {
+            if (preferred != null && preferred != ObdProtocol.AUTO) {
+                progress("Опит с последния протокол: ${preferred.title}…")
+                tried += preferred
+                if (tryProtocol(preferred, 12_000)) return finishDetection(preferred)
+            }
 
-        if (preferred != null && preferred != ObdProtocol.AUTO) {
-            progress("Опит с последния протокол: ${preferred.title}…")
-            tried += preferred
-            if (tryProtocol("ATSP${preferred.code}", 10_000)) return finishDetection(preferred)
-        }
+            progress("Автоматично търсене на протокол…")
+            if (tryProtocol(ObdProtocol.AUTO, 25_000)) {
+                val dpn = runCatching { elm.send("ATDPN", 2_000) }.getOrNull()?.firstOrNull()
+                val p = dpn?.let { ObdProtocol.fromDpn(it) }
+                if (p != null) return finishDetection(p)
+            }
 
-        progress("Автоматично търсене на протокол…")
-        if (tryProtocol("ATSP0", 25_000)) {
-            val dpn = runCatching { elm.send("ATDPN", 2_000) }.getOrNull()?.firstOrNull()
-            val p = dpn?.let { ObdProtocol.fromDpn(it) }
-            if (p != null) return finishDetection(p)
+            // Some adapters' automatic search is unreliable, so walk the list by hand.
+            val order = listOf(
+                ObdProtocol.CAN_11_500, ObdProtocol.CAN_29_500, ObdProtocol.CAN_11_250, ObdProtocol.CAN_29_250,
+                ObdProtocol.KWP_FAST, ObdProtocol.KWP_SLOW, ObdProtocol.ISO_9141,
+                ObdProtocol.J1850_VPW, ObdProtocol.J1850_PWM,
+            )
+            for (p in order) {
+                if (p in tried) continue
+                progress("Опит: ${p.title}…")
+                if (tryProtocol(p, if (p.isCan) 6_000L else 15_000L)) return finishDetection(p)
+            }
+            throw VehicleNotRespondingException(
+                "Автомобилът не отговаря. Завъртете ключа на позиция ON (или запалете двигателя) и опитайте отново.",
+            )
+        } finally {
+            attempts = attemptLog.toList()
         }
-
-        // Some adapters' automatic search is unreliable, so walk the list by hand.
-        val order = listOf(
-            ObdProtocol.CAN_11_500, ObdProtocol.CAN_29_500, ObdProtocol.CAN_11_250, ObdProtocol.CAN_29_250,
-            ObdProtocol.KWP_FAST, ObdProtocol.KWP_SLOW, ObdProtocol.ISO_9141,
-            ObdProtocol.J1850_VPW, ObdProtocol.J1850_PWM,
-        )
-        for (p in order) {
-            if (p in tried) continue
-            progress("Опит: ${p.title}…")
-            val timeout = if (p.isCan) 6_000L else 12_000L
-            if (tryProtocol("ATSP${p.code}", timeout)) return finishDetection(p)
-        }
-        throw VehicleNotRespondingException(
-            "Автомобилът не отговаря. Завъртете ключа на позиция ON (или запалете двигателя) и опитайте отново.",
-        )
     }
 
-    private suspend fun tryProtocol(select: String, timeoutMs: Long): Boolean {
-        runCatching { elm.send(select, 2_000) }
-        repeat(2) { attempt ->
+    private suspend fun tryProtocol(p: ObdProtocol, timeoutMs: Long): Boolean {
+        val kLine = p == ObdProtocol.KWP_FAST || p == ObdProtocol.KWP_SLOW || p == ObdProtocol.ISO_9141
+        runCatching { elm.send("ATSP${p.code}", 2_000) }
+        if (kLine) {
+            // Old control units answer slowly: allow the longest wait, and let the bus rest before a new init.
+            runCatching { elm.send("ATSTFF", 2_000) }
+            delay(600)
+        } else if (p != ObdProtocol.AUTO) {
+            runCatching { elm.send("ATST32", 2_000) }
+        }
+        var firstMs = -1L
+        var answer = "няма отговор"
+        var ok = false
+        for (attempt in 0 until if (kLine) 3 else 2) {
+            val started = clock()
             val lines = try {
                 elm.send("0100", timeoutMs)
             } catch (e: ElmTimeoutException) {
+                answer = "адаптерът не отговори навреме"
                 emptyList()
             }
-            if (lines.any { it.replace(" ", "").contains("4100") }) return true
+            if (firstMs < 0) firstMs = clock() - started
+            if (lines.any { it.replace(" ", "").contains("4100") }) {
+                ok = true
+                answer = "OK"
+                break
+            }
             val err = ElmErrors.find(lines)
-            // Hard bus errors mean wrong protocol: do not retry.
-            if (err != null && err != "NO DATA") return false
-            if (attempt == 0) delay(300)
+            if (err != null) answer = err else if (lines.isNotEmpty()) answer = lines.joinToString(" | ").take(60)
+            // Hard bus errors mean wrong protocol: do not retry. A failed K-line init is retried once,
+            // because the first wake-up after switching the ignition on often fails.
+            if (err != null && err != "NO DATA" && !(kLine && attempt == 0 && err == "BUS INIT ERROR")) break
+            delay(if (kLine) 1_500 else 300)
         }
-        return false
+        attemptLog += ProtocolAttempt(p, answer, firstMs.coerceAtLeast(0))
+        return ok
     }
 
     private fun finishDetection(p: ObdProtocol): ObdProtocol {
@@ -151,6 +192,15 @@ class ObdSession(val elm: Elm327, private val log: CommLog) {
     /** Undo header / filter / flow-control changes made for module access. */
     suspend fun restoreObdDefaults() {
         adapterDirty = false
+        if (kLineDirty) {
+            // Header, wake-up message and protocol were changed: start from the adapter's defaults.
+            kLineDirty = false
+            runCatching { elm.send("ATD", 3_000) }
+            applySettings()
+            if (vehicleConnected) runCatching { elm.send("ATSP${protocol.code}", 2_000) }
+            runCatching { elm.send(if (protocol.isCan) "ATST32" else "ATSTFF", 2_000) }
+            return
+        }
         runCatching { elm.send("ATFCSM0", 2_000) }
         val cra = runCatching { elm.send("ATCRA", 2_000) }.getOrNull()
         if (cra == null || ElmErrors.find(cra) == "?") {
@@ -168,7 +218,8 @@ class ObdSession(val elm: Elm327, private val log: CommLog) {
             // ELM327 default header for ISO 14230-4 (functional OBD request).
             runCatching { elm.send("ATSHC133F1", 2_000) }
         }
-        runCatching { elm.send("ATST32", 2_000) }
+        // K-line control units can be slow; with adaptive timing this is only the upper limit.
+        runCatching { elm.send(if (protocol.isCan) "ATST32" else "ATSTFF", 2_000) }
         runCatching { elm.send("ATAT1", 2_000) }
     }
 

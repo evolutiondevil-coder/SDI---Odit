@@ -74,18 +74,18 @@
   },
   {
    "id": "modules",
-   "version": 1,
+   "version": 2,
    "file": "packs/modules.json",
-   "bytes": 4831,
-   "sha256": "6f927599a355bfc05cee9971dbc4d47962c1b2602772c3d4b58177e3e3b37c27",
+   "bytes": 6140,
+   "sha256": "f433d0d0630c4139267b40359db0abcaad121087d21c02f3e6090f53a4f185bb",
    "title": "Имена на модули по марки (CAN адреси)"
   },
   {
    "id": "vin-rules",
-   "version": 1,
+   "version": 2,
    "file": "packs/vin-rules.json",
-   "bytes": 9358,
-   "sha256": "135a7e0b4b8875e8af6ef901ea042cad3c5ad48965114427daaa06966965be18",
+   "bytes": 16677,
+   "sha256": "9c1246485bc25d48631487fe0fe9a3c5cc2c99e1bf85cf844e09a461ea7f8a89",
    "title": "Правила за модел и година по VIN"
   },
   {

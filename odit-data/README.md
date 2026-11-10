@@ -46,13 +46,17 @@ odit-data/
 
 - `dtc-*`: `{"codes": {"P1450": "описание", ...}}`
 - `modules`: `{"groups": {"VAG": [{"tx": "713", "rx": "77D", "name": "ABS / ESP"}, ...]}}`
-  (групи: VAG, FORD, TOYOTA, HYUNDAI_KIA, RENAULT_NISSAN)
+  (групи: VAG, FORD, TOYOTA, HYUNDAI_KIA, RENAULT_NISSAN); по желание и
+  `"kline": {"RENAULT_NISSAN": [{"addr": "7A", "name": "Двигател"}], "ANY": [{"addr": "10"}]}` —
+  адреси за директна връзка по K-line (стари коли)
 - `wmi`: `{"order": "...", "countries": [{"from": "XA", "to": "XC", "country": "България"}],
   "wmi": {"WVW": {"maker": "...", "make": "Volkswagen", "group": "VAG", "country": "Германия"}}}`
 - `vin-rules`: `{"yearCodes": "...", "default": {...}, "northAmerica": {...}, "maps": {...},
   "makes": {"Volkswagen": {"years": [{"pos": 10, "policy": "reliable"}],
   "models": [{"if": {"pos": "4-6", "is": "ZZZ"}, "code": "7-8", "label": "тип", "map": "vw"}]}}}`
   — `policy`: `reliable` (показва се като сигурна), `probable` („вероятно“), `none` (не се показва).
+  Правило за модел може да има и `"years": "<име на таблица>"` — годините на поколението по същия
+  код (`"5R": "2012–2020"`), които се показват, когато точната година не е известна.
 
 ## Как да обновите таблица
 

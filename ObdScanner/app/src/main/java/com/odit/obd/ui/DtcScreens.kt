@@ -67,6 +67,7 @@ fun DtcScreen(vm: MainViewModel, snackbar: SnackbarHostState, onShare: (String) 
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            vm.clearNotice?.let { n -> item(key = "notice") { ClearNoticeCard(n) } }
             d.error?.let { err ->
                 item { InfoCard(color = Palette.Bad.copy(alpha = 0.15f)) { Text(err, color = Palette.Bad) } }
             }
@@ -118,12 +119,22 @@ private fun androidx.compose.foundation.lazy.LazyListScope.dtcSection(
         Text(hint, color = Palette.Muted, style = MaterialTheme.typography.bodySmall)
     }
     items(list, key = { title + it.ecu + it.dtc.code }) { e ->
-        DtcCard(e.dtc, ObdSession.ecuName(e.ecu), onSearch, vm.vehicle.shortName.ifBlank { null })
+        DtcCard(e.dtc, ObdSession.ecuName(e.ecu), onSearch, vm.vehicle.shortName.ifBlank { null }, returned = e.dtc.code in vm.dtc.returned)
+    }
+}
+
+/** Result of the last clear ("Грешката е изтрита", what came back, why it was refused). */
+@Composable
+fun ClearNoticeCard(n: ClearNotice) {
+    val color = if (n.ok) Palette.Ok else Palette.Warn
+    InfoCard(color = color.copy(alpha = 0.15f)) {
+        Text(n.title, color = color, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        n.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
 @Composable
-fun DtcCard(dtc: Dtc, source: String?, onSearch: (String) -> Unit, make: String?) {
+fun DtcCard(dtc: Dtc, source: String?, onSearch: (String) -> Unit, make: String?, returned: Boolean = false) {
     InfoCard {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
@@ -136,6 +147,7 @@ fun DtcCard(dtc: Dtc, source: String?, onSearch: (String) -> Unit, make: String?
             Chip(dtc.kind.title, kindColor(dtc.kind))
             source?.let { Chip(it, Palette.Muted) }
         }
+        if (returned) Chip("Върна се веднага след изтриването", Palette.Warn)
         Text(dtc.description, style = MaterialTheme.typography.bodyMedium)
         dtc.descriptionSource?.let { Text("Описание $it", color = Palette.Muted, style = MaterialTheme.typography.bodySmall) }
         dtc.ftbDescription?.let { Text("Тип: $it", color = Palette.Muted, style = MaterialTheme.typography.bodySmall) }
@@ -171,56 +183,77 @@ fun ModulesScreen(vm: MainViewModel, snackbar: SnackbarHostState, onShare: (Stri
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (!isCan) {
+                // Cars that are not on CAN (or have no OBD2 at all): the control units are reached one by one on the K-line.
                 item {
-                    InfoCard(color = Palette.Warn.copy(alpha = 0.15f)) {
+                    InfoCard {
+                        Text("Директна връзка по K-line (експериментално)", fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Този автомобил използва ${vm.protocol?.title ?: "стар протокол"}. Сканирането на всички модули " +
-                                "работи само с CAN автомобили (обикновено от 2008 г. насам). Грешките на двигателя са достъпни.",
+                            (vm.protocol?.let { "Тази кола използва ${it.title}, а не CAN. " } ?: "Колата не отговори на стандартен OBD2. ") +
+                                "Компютрите ѝ се търсят един по един по стария K-line протокол. Четат се и се изтриват грешки; " +
+                                "кодовете са с номерацията на производителя, затова често са без описание.",
+                            color = Palette.Muted,
                             style = MaterialTheme.typography.bodySmall,
                         )
-                    }
-                }
-            }
-            item {
-                InfoCard {
-                    Text(
-                        "Пита всеки диагностичен адрес за грешки — не е нужен модел или VIN. " +
-                            "Бързото проверява известните адреси (~15 сек.), пълното — всички (~1 мин.).",
-                        color = Palette.Muted,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    if (m.scanning) {
-                        val progress = if (m.total > 0) m.done.toFloat() / m.total else 0f
-                        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
-                        Text(
-                            "Проверка на ${m.current} · ${m.done}/${m.total} · намерени: ${m.modules.size}",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        OutlinedButton(onClick = { vm.stopModuleScan() }, modifier = Modifier.fillMaxWidth()) { Text("Спри") }
-                    } else {
-                        val known = vm.knownModules
-                        if (known.isNotEmpty()) {
+                        if (m.scanning) {
+                            val progress = if (m.total > 0) m.done.toFloat() / m.total else 0f
+                            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                            Text(
+                                "Проверка на ${m.current} · ${m.done}/${m.total} · намерени: ${m.modules.size}",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            OutlinedButton(onClick = { vm.stopModuleScan() }, modifier = Modifier.fillMaxWidth()) { Text("Спри") }
+                        } else {
                             Button(
-                                onClick = { vm.scanModules(full = false, knownOnly = true) },
-                                enabled = isCan && vm.busy == null,
+                                onClick = { vm.scanKLine() },
+                                enabled = vm.busy == null,
                                 modifier = Modifier.fillMaxWidth(),
-                            ) { Text("Модулите от миналия път (${known.size})") }
+                            ) { Text("Търси модули по K-line") }
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = { vm.scanModules(full = false) },
-                                enabled = isCan && vm.busy == null,
-                                modifier = Modifier.weight(1f),
-                            ) { Text("Бързо") }
-                            OutlinedButton(
-                                onClick = { vm.scanModules(full = true) },
-                                enabled = isCan && vm.busy == null,
-                                modifier = Modifier.weight(1f),
-                            ) { Text("Пълно") }
+                    }
+                }
+            } else {
+            item {
+                    InfoCard {
+                        Text(
+                            "Пита всеки диагностичен адрес за грешки — не е нужен модел или VIN. " +
+                                "Бързото проверява известните адреси (~15 сек.), пълното — всички (~1 мин.).",
+                            color = Palette.Muted,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        if (m.scanning) {
+                            val progress = if (m.total > 0) m.done.toFloat() / m.total else 0f
+                            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                            Text(
+                                "Проверка на ${m.current} · ${m.done}/${m.total} · намерени: ${m.modules.size}",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            OutlinedButton(onClick = { vm.stopModuleScan() }, modifier = Modifier.fillMaxWidth()) { Text("Спри") }
+                        } else {
+                            val known = vm.knownModules
+                            if (known.isNotEmpty()) {
+                                Button(
+                                    onClick = { vm.scanModules(full = false, knownOnly = true) },
+                                    enabled = isCan && vm.busy == null,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) { Text("Модулите от миналия път (${known.size})") }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = { vm.scanModules(full = false) },
+                                    enabled = isCan && vm.busy == null,
+                                    modifier = Modifier.weight(1f),
+                                ) { Text("Бързо") }
+                                OutlinedButton(
+                                    onClick = { vm.scanModules(full = true) },
+                                    enabled = isCan && vm.busy == null,
+                                    modifier = Modifier.weight(1f),
+                                ) { Text("Пълно") }
+                            }
                         }
                     }
                 }
             }
+            vm.clearNotice?.let { n -> item(key = "notice") { ClearNoticeCard(n) } }
             m.error?.let { err -> item { InfoCard(color = Palette.Bad.copy(alpha = 0.15f)) { Text(err, color = Palette.Bad) } } }
             if (m.finished && !m.scanning) {
                 item {
@@ -232,7 +265,10 @@ fun ModulesScreen(vm: MainViewModel, snackbar: SnackbarHostState, onShare: (Stri
                 }
             }
             items(m.modules, key = { it.responseHeader }) { mod ->
-                ModuleCard(mod, enabled = vm.busy == null && !m.scanning, onClear = { confirm = listOf(mod) }, onSearch = onSearch, make = vm.vehicle.shortName.ifBlank { null })
+                ModuleCard(
+                    mod, enabled = vm.busy == null && !m.scanning, onClear = { confirm = listOf(mod) }, onSearch = onSearch,
+                    make = vm.vehicle.shortName.ifBlank { null }, returned = m.returned,
+                )
             }
             val withCodes = m.modules.filter { it.dtcs.isNotEmpty() }
             if (withCodes.size > 1 && !m.scanning) {
@@ -257,7 +293,14 @@ fun ModulesScreen(vm: MainViewModel, snackbar: SnackbarHostState, onShare: (Stri
 }
 
 @Composable
-private fun ModuleCard(m: FoundModule, enabled: Boolean, onClear: () -> Unit, onSearch: (String) -> Unit, make: String?) {
+private fun ModuleCard(
+    m: FoundModule,
+    enabled: Boolean,
+    onClear: () -> Unit,
+    onSearch: (String) -> Unit,
+    make: String?,
+    returned: Set<String> = emptySet(),
+) {
     InfoCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -278,6 +321,7 @@ private fun ModuleCard(m: FoundModule, enabled: Boolean, onClear: () -> Unit, on
                 Text(dtc.displayCode, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = kindColor(dtc.kind))
                 Chip(dtc.kind.title, kindColor(dtc.kind))
             }
+            if ("${m.tx}:${dtc.displayCode}" in returned) Chip("Върна се веднага след изтриването", Palette.Warn)
             Text(dtc.description, style = MaterialTheme.typography.bodySmall)
             dtc.descriptionSource?.let { Text("Описание $it", color = Palette.Muted, style = MaterialTheme.typography.bodySmall) }
             dtc.ftbDescription?.let { Text("Тип: $it", color = Palette.Muted, style = MaterialTheme.typography.bodySmall) }

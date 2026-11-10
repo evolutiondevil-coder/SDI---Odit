@@ -12,11 +12,18 @@ import com.odit.obd.vin.VinMethod
 import com.odit.obd.vin.VinParser
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
-enum class DiagType { UDS, KWP }
+enum class DiagType {
+    UDS,
+    KWP,
+
+    /** KWP2000 on the K-line with physical addressing (cars before CAN, often before OBD2). */
+    KLINE,
+}
 
 data class FoundModule(
     /** 11-bit request id, or the target address byte for 29-bit CAN. */
@@ -32,7 +39,12 @@ data class FoundModule(
     /** VIN stored in this module (UDS 22 F190 / KWP 1A 90), if it reports one. */
     val vin: String? = null,
 ) {
-    val addressLabel: String get() = if (is29) "18DA%02XF1".format(tx) else "0x%03X".format(tx)
+    val addressLabel: String
+        get() = when {
+            type == DiagType.KLINE -> "K-line 0x%02X".format(tx)
+            is29 -> "18DA%02XF1".format(tx)
+            else -> "0x%03X".format(tx)
+        }
 
     val title: String get() = catalogName ?: identification ?: "Модул $addressLabel"
 }
@@ -101,7 +113,13 @@ class ModuleScanner(private val s: ObdSession) {
             for (m in modules) {
                 currentCoroutineContext().ensureActive()
                 val result = clearOne(m)
-                val again = probe(m.tx, m.rx, m.catalogName, brand)
+                // Many modules need a moment (some restart) before they answer again.
+                delay(400)
+                var again = probe(m.tx, m.rx, m.catalogName, brand)
+                if (again == null) {
+                    delay(1_200)
+                    again = probe(m.tx, m.rx, m.catalogName, brand)
+                }
                 out += result to again
             }
         } finally {
@@ -217,13 +235,13 @@ class ModuleScanner(private val s: ObdSession) {
         val ident = when (type) {
             DiagType.UDS -> readUdsIdent(tx)
             DiagType.KWP -> exchange(tx, "1A9B", 0x1A)?.takeIf { nrcOf(it) == null }?.let { ascii(it.data.drop(2)) }
-            null -> null
+            else -> null
         }?.takeIf { it.isNotBlank() }
 
         val vin = when (type) {
             DiagType.UDS -> readVinFrom(tx, DiagType.UDS)
             DiagType.KWP -> readVinFrom(tx, DiagType.KWP)
-            null -> null
+            else -> null
         }
 
         val name = catalogName

@@ -35,7 +35,11 @@ import com.odit.obd.vin.VinParser
 import com.odit.obd.vin.VinReader
 import com.odit.obd.vin.VinReport
 import com.odit.obd.BuildConfig
+import com.odit.obd.uds.DiagType
 import com.odit.obd.uds.FoundModule
+import com.odit.obd.uds.KLineDirect
+import com.odit.obd.uds.ModuleCatalog
+import com.odit.obd.obd.ProtocolAttempt
 import com.odit.obd.uds.ModuleAddress
 import com.odit.obd.data.AppPackSource
 import com.odit.obd.data.DataPacks
@@ -94,6 +98,16 @@ data class Overview(
     val vinManual: Boolean = false,
 )
 
+/** Outcome of the last clear, shown on the screen until the next read. */
+data class ClearNotice(val ok: Boolean, val title: String, val detail: String? = null)
+
+/** "Грешката е изтрита." / "Грешките са изтрити (3)." */
+fun clearedText(n: Int): String = when (n) {
+    0 -> "Няма грешки за изтриване."
+    1 -> "Грешката е изтрита."
+    else -> "Грешките са изтрити ($n)."
+}
+
 data class DtcUi(
     val loading: Boolean = false,
     val loaded: Boolean = false,
@@ -101,6 +115,8 @@ data class DtcUi(
     val pending: List<EcuDtc> = emptyList(),
     val permanent: List<EcuDtc> = emptyList(),
     val error: String? = null,
+    /** Codes that were cleared but the car reported again at once (the fault is still present). */
+    val returned: Set<String> = emptySet(),
 ) {
     val total: Int get() = stored.size + pending.size + permanent.size
 }
@@ -113,6 +129,8 @@ data class ModulesUi(
     val modules: List<FoundModule> = emptyList(),
     val finished: Boolean = false,
     val error: String? = null,
+    /** "tx:code" of codes that came back right after clearing. */
+    val returned: Set<String> = emptySet(),
 )
 
 data class LiveUi(
@@ -163,9 +181,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var vehicleError by mutableStateOf<String?>(null)
         private set
+
+    /** Why the car probably did not answer, in plain words (shown with [vehicleError]). */
+    var connectDiagnosis by mutableStateOf<String?>(null)
+        private set
+
+    /** What the adapter answered for every protocol tried. */
+    var connectAttempts by mutableStateOf<List<ProtocolAttempt>>(emptyList())
+        private set
+
+    /** VINs typed earlier for cars used with this adapter (offered as one-tap choices). */
+    var vinSuggestions by mutableStateOf<List<String>>(emptyList())
+        private set
     var overview by mutableStateOf(Overview())
         private set
     var dtc by mutableStateOf(DtcUi())
+        private set
+
+    /** What the last clear did; cleared again by the next read or scan. */
+    var clearNotice by mutableStateOf<ClearNotice?>(null)
         private set
     var modules by mutableStateOf(ModulesUi())
         private set
@@ -346,13 +380,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val bluetoothAvailable: Boolean get() = btAdapter != null
     val vehicleReady: Boolean get() = session?.vehicleConnected == true
+
+    /** The adapter is connected (even if the car did not answer standard OBD). */
+    val adapterReady: Boolean get() = session != null
     private val brand: Brand get() = vehicle.group
 
     // ------------------------------------------------------------- navigation
 
     fun open(target: Screen) {
         val needsVehicle = target !in setOf(Screen.CONNECT, Screen.HOME, Screen.TERMINAL, Screen.INFO, Screen.GARAGE)
-        if (needsVehicle && !vehicleReady) {
+        // Modules can also be reached directly over the K-line when standard OBD got no answer.
+        val allowed = vehicleReady || (target == Screen.MODULES && adapterReady)
+        if (needsVehicle && !allowed) {
             message = "Няма връзка с автомобила. Включете запалването и натиснете „Опитай отново“."
             return
         }
@@ -470,7 +509,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     conn = ConnState.Connecting("Свързване (${t.description})…")
                     withTimeout(45_000) { t.connect() }
                     conn = ConnState.Connecting("Инициализация на адаптера…")
-                    val s = ObdSession(Elm327(t, log), log)
+                    val s = ObdSession(Elm327(t, log), log) { android.os.SystemClock.elapsedRealtime() }
                     s.initAdapter()
                     transport = t
                     session = s
@@ -510,22 +549,49 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun connectVehicle(s: ObdSession) {
         vehicleError = null
+        connectDiagnosis = null
         busy = "Свързване с автомобила…"
         try {
-            // The protocol of the car last seen with this adapter is tried first (faster reconnect).
-            val fromGarage = lastDevice?.address?.takeIf { !demo }?.let { garage.lastForAdapter(it)?.protocol }
+            // Tried first, for a faster reconnect: the protocol saved for this VIN (if the user gave one),
+            // else that of the car last seen with this adapter.
+            val fromGarage = car?.protocol ?: lastDevice?.address?.takeIf { !demo }?.let { garage.lastForAdapter(it)?.protocol }
             val preferred = (fromGarage ?: prefs.getString("protocol", null)?.firstOrNull())?.let { ObdProtocol.fromCode(it) }
             val p = s.connectVehicle(if (demo) null else preferred) { step -> busy = step }
             protocol = p
+            connectAttempts = s.attempts
             if (!demo) prefs.edit().putString("protocol", p.code.toString()).apply()
             busy = "Четене на данни за автомобила…"
             loadOverview(s)
         } catch (e: VehicleNotRespondingException) {
+            connectAttempts = s.attempts
+            val voltage = runCatching { s.batteryVoltage() }.getOrNull()
+            overview = overview.copy(voltage = voltage)
+            connectDiagnosis = diagnose(s.attempts, voltage)
             vehicleError = e.message
+            refreshVinSuggestions()
         } catch (e: TransportException) {
             connectionLost(e)
         } finally {
             busy = null
+        }
+    }
+
+    /** Plain-words guess at why no protocol worked, from how the adapter answered. */
+    private fun diagnose(attempts: List<ProtocolAttempt>, voltage: Double?): String {
+        val kLine = attempts.filter { it.protocol in setOf(ObdProtocol.KWP_FAST, ObdProtocol.KWP_SLOW, ObdProtocol.ISO_9141) }
+        val volts = voltage?.let { "%.1f V".format(Locale.US, it) }
+        return when {
+            voltage != null && voltage < 6.0 ->
+                "Адаптерът не отчита напрежение от колата ($volts). Проверете дали е влязъл добре в буксата и бушона " +
+                    "на диагностичната букса (често е общ със запалката)."
+            // A real K-line wake-up takes seconds; an instant refusal means the adapter never tried.
+            kLine.isNotEmpty() && kLine.all { it.answer == "?" || (it.ms < 900 && it.answer != "OK") } ->
+                "Адаптерът отказа опитите по K-line почти мигновено — изглежда в този режим той не поддържа K-line, " +
+                    "а по нея говорят колите отпреди CAN (до около 2005–2008 г.). Пратете лога, за да се потвърди."
+            else ->
+                "Колата не отговори на нито един стандартен OBD2 протокол" + (volts?.let { " (напрежение $it)" } ?: "") + ". " +
+                    "Ако запалването е включено, най-вероятно колата е отпреди OBD2: в Европа той е задължителен от 2001 г. " +
+                    "за бензиновите и от 2004 г. за дизеловите коли. Опитайте „Директна връзка“ по-долу."
         }
     }
 
@@ -558,7 +624,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val carKey: String
         get() = if (demo) "demo:${demoScenario?.name}" else (lastDevice?.address ?: "unknown")
 
-    private fun manualVin(): String? = prefs.getString("manualVin:$carKey", null)
+    /** VIN typed for the car connected now. It is not kept for the adapter: the next car may be another one. */
+    private var sessionManualVin: String? = null
+
+    private fun manualVin(): String? = sessionManualVin
+
+    private fun refreshVinSuggestions() {
+        val adapter = if (demo) "demo" else lastDevice?.address
+        val fromGarage = runCatching { garage.all() }.getOrDefault(emptyList())
+            .filter { it.vinManual && it.vin != null && it.adapter == adapter }.mapNotNull { it.vin }
+        // Version 1.1 kept one typed VIN per adapter.
+        val legacy = prefs.getString("manualVin:$carKey", null)
+        vinSuggestions = (fromGarage + listOfNotNull(legacy)).distinct().filter { it != overview.vin }.take(3)
+    }
 
     private fun applyVin(report: VinReport) {
         val manual = manualVin()
@@ -569,6 +647,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             vinManual = report.vin == null && manual != null,
         )
         attachCar(vin)
+        if (report.vin == null && manual != null) updateCar { it.copy(vinManual = true) }
+        refreshVinSuggestions()
     }
 
     /** Finds or creates the garage entry for the connected car and refreshes what is known about it. */
@@ -628,14 +708,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setManualVin(input: String): String? {
         val vin = input.trim().uppercase().replace(" ", "")
         if (vin.isEmpty()) {
-            prefs.edit().remove("manualVin:$carKey").apply()
+            sessionManualVin = null
             applyVin(overview.vinReport)
             return null
         }
         if (!VinParser.isValidFormat(vin)) {
             return "VIN трябва да е точно 17 знака: цифри и латински букви без I, O и Q."
         }
-        prefs.edit().putString("manualVin:$carKey", vin).apply()
+        sessionManualVin = vin
         applyVin(overview.vinReport)
         return null
     }
@@ -678,12 +758,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         busy = null
         protocol = null
         vehicleError = null
+        connectDiagnosis = null
+        connectAttempts = emptyList()
+        sessionManualVin = null
+        vinSuggestions = emptyList()
         overview = Overview()
         vehicle = VehicleIdentity.UNKNOWN
         car = null
         onlineBusy = false
         triedOnline.clear()
         dtc = DtcUi()
+        clearNotice = null
         modules = ModulesUi()
         live = LiveUi()
         readiness = Loadable()
@@ -726,6 +811,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------------ DTCs
 
     fun readDtcs() {
+        clearNotice = null
         dtc = dtc.copy(loading = true, error = null)
         val started = op("Четене на грешките…", onError = { dtc = dtc.copy(loading = false, error = it) }) { s ->
             val stored = s.readDtcs(0x03)
@@ -739,16 +825,57 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearDtcs() {
         op("Изтриване на грешките…") { s ->
+            // Compare with what the car reports right now, not with a list that may be old.
+            val before = (soft { s.readDtcs(0x03) + s.readDtcs(0x07) } ?: (dtc.stored + dtc.pending)).map { it.dtc.code }.distinct()
             val result = s.clearDtcs()
-            message = result.message
-            if (result.ok) addHistory(ScanRecord.CLEAR, dtc.stored.map { it.dtc.code }, "OBD")
-            delay(500)
+            delay(700) // the control unit needs a moment after clearing
             val stored = s.readDtcs(0x03)
             val pending = s.readDtcs(0x07)
             val permanent = runCatching { s.readDtcs(0x0A) }.getOrDefault(emptyList())
-            dtc = DtcUi(loaded = true, stored = stored, pending = pending, permanent = permanent)
+            val after = (stored + pending).map { it.dtc.code }.toSet()
+            val back = before.filter { it in after }
+            val gone = before.size - back.size
+            dtc = DtcUi(loaded = true, stored = stored, pending = pending, permanent = permanent, returned = if (result.ok) back.toSet() else emptySet())
             freeze = Loadable()
+
+            val permanentNote = if (permanent.isNotEmpty()) {
+                "Постоянните грешки (${permanent.size}) не се изтриват с уред — изчезват сами, след като колата провери, че проблемът го няма."
+            } else {
+                null
+            }
+            val notice = when {
+                !result.ok -> ClearNotice(false, "Грешките не са изтрити", result.message)
+                back.isEmpty() -> ClearNotice(true, clearedText(gone), permanentNote)
+                else -> ClearNotice(
+                    gone > 0,
+                    if (gone > 0) "Изтрити: $gone. Върнаха се веднага: ${back.size}" else if (back.size == 1) "Грешката се върна веднага" else "Грешките се върнаха веднага (${back.size})",
+                    listOfNotNull(
+                        "${back.joinToString()} — проблемът е налице в момента, затова колата записва грешката отново. Отстранете причината и изтрийте пак.",
+                        permanentNote,
+                    ).joinToString("\n"),
+                )
+            }
+            clearNotice = notice
+            message = notice.title
+            if (result.ok && gone > 0) addHistory(ScanRecord.CLEAR, before.filter { it !in after }, "OBD")
+
+            // The module list (if scanned) shows the same control units: refresh the ones that had codes.
+            val stale = modules.modules.filter { it.dtcs.isNotEmpty() && it.type != DiagType.KLINE }
+            if (result.ok && stale.isNotEmpty() && s.protocol.isCan) {
+                busy = "Проверка на модулите…"
+                val fresh = soft {
+                    ModuleScanner(s).scan(false, brand, { _, _, _ -> }, {}, only = stale.map { ModuleAddress(it.tx, it.rx, it.catalogName) })
+                }
+                if (fresh != null) {
+                    modules = modules.copy(
+                        modules = modules.modules.map { old -> fresh.firstOrNull { it.tx == old.tx } ?: old },
+                        returned = emptySet(),
+                    )
+                }
+            }
             loadOverview(s)
+            // Cleared from the home screen: show the result where the list is.
+            if (screen == Screen.HOME) screen = Screen.DTC
         }
     }
 
@@ -758,6 +885,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val knownModules: List<SavedModule> get() = car?.modules.orEmpty()
 
     fun scanModules(full: Boolean, knownOnly: Boolean = false) {
+        clearNotice = null
         modules = ModulesUi(scanning = true)
         val only = if (knownOnly) knownModules.map { ModuleAddress(it.tx, it.rx, it.name) } else null
         val started = op(if (full) "Пълно сканиране на модулите…" else "Сканиране на модулите…",
@@ -785,24 +913,95 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (!started) modules = ModulesUi()
     }
 
+    /** EXPERIMENTAL: looks for control units directly on the K-line (old cars, see [KLineDirect]). */
+    fun scanKLine() {
+        clearNotice = null
+        modules = ModulesUi(scanning = true)
+        val started = op("Търсене на модули по K-line…", onError = { modules = modules.copy(scanning = false, error = it) }) { s ->
+            try {
+                val found = KLineDirect(s).scan(
+                    ModuleCatalog.kLineTargets(brand),
+                    onProgress = { done, total, label -> modules = modules.copy(done = done, total = total, current = label) },
+                    onFound = { m -> modules = modules.copy(modules = modules.modules + m) },
+                )
+                modules = modules.copy(
+                    scanning = false, finished = true, modules = found,
+                    error = if (found.isEmpty()) {
+                        "Нито един модул не отговори по K-line. Проверете дали запалването е включено. Ако е — пратете лога " +
+                            "(„Информация“ → „Експорт на лога“), за да се види какво отговаря адаптерът."
+                    } else {
+                        null
+                    },
+                )
+                if (found.isNotEmpty()) {
+                    updateCar { it.copy(modules = Garage.fromModules(found)) }
+                    addHistory(ScanRecord.MODULES, found.flatMap { m -> m.dtcs.map { it.displayCode } }.distinct(), "${found.size} модула, K-line")
+                    applyVin(VinReader.withModules(overview.vinReport, found))
+                }
+            } finally {
+                if (modules.scanning) modules = modules.copy(scanning = false, finished = true)
+            }
+        }
+        if (!started) modules = ModulesUi()
+    }
+
     fun stopModuleScan() {
         if (modules.scanning) opJob?.cancel()
     }
 
     fun clearModules(list: List<FoundModule>) {
         op("Изтриване на грешките в модулите…") { s ->
-            val results = ModuleScanner(s).clear(list, brand)
+            val (kLine, can) = list.partition { it.type == DiagType.KLINE }
+            val list = can + kLine
+            val results = (if (can.isEmpty()) emptyList() else ModuleScanner(s).clear(can, brand)) +
+                (if (kLine.isEmpty()) emptyList() else KLineDirect(s).clear(kLine))
             var current = modules.modules
+            var cleared = 0
+            val clearedCodes = mutableListOf<String>()
+            val back = mutableListOf<String>()
+            val returned = mutableSetOf<String>()
             val failures = mutableListOf<String>()
             for ((i, pair) in results.withIndex()) {
                 val (r, again) = pair
                 val m = list[i]
-                if (again != null) current = current.map { if (it.tx == m.tx) again else it }
-                if (!r.ok) failures += "${m.title}: ${r.message}"
+                val beforeCodes = m.dtcs.map { it.displayCode }
+                val now = when {
+                    again != null -> again
+                    // Cleared, but the module is still restarting: do not leave the old rows on screen.
+                    r.ok -> m.copy(dtcs = emptyList(), readError = "Изтрито. Модулът не отговори при повторната проверка — сканирайте отново след малко.")
+                    else -> m
+                }
+                current = current.map { if (it.tx == m.tx) now else it }
+                if (r.ok) {
+                    val still = now.dtcs.map { it.displayCode }.filter { it in beforeCodes }
+                    cleared += beforeCodes.size - still.size
+                    clearedCodes += beforeCodes.filter { it !in still }
+                    still.forEach { returned += "${m.tx}:$it"; back += "${m.title}: $it" }
+                } else {
+                    failures += "${m.title}: ${r.message}"
+                }
             }
-            modules = modules.copy(modules = current)
-            if (failures.size < list.size) addHistory(ScanRecord.CLEAR, list.flatMap { m -> m.dtcs.map { it.displayCode } }, "модули")
-            message = if (failures.isEmpty()) "Грешките са изтрити." else failures.joinToString("\n")
+            modules = modules.copy(modules = current, returned = returned)
+            if (clearedCodes.isNotEmpty()) addHistory(ScanRecord.CLEAR, clearedCodes, "модули")
+
+            val details = mutableListOf<String>()
+            if (back.isNotEmpty()) {
+                details += "Върнаха се веднага (проблемът е налице в момента): " + back.joinToString("; ")
+            }
+            if (failures.isNotEmpty()) details += failures
+            val notice = when {
+                details.isEmpty() -> ClearNotice(true, clearedText(cleared))
+                cleared > 0 -> ClearNotice(true, "Изтрити: $cleared", details.joinToString("\n"))
+                failures.isNotEmpty() && back.isEmpty() -> ClearNotice(false, "Грешките не са изтрити", details.joinToString("\n"))
+                else -> ClearNotice(false, if (back.size == 1) "Грешката се върна веднага" else "Грешките се върнаха веднага (${back.size})", details.joinToString("\n"))
+            }
+            clearNotice = notice
+            message = notice.title
+
+            // The engine list (OBD) and the lamp status are now out of date too.
+            dtc = DtcUi()
+            freeze = Loadable()
+            if (s.vehicleConnected) loadOverview(s)
         }
     }
 

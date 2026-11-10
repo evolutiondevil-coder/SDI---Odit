@@ -29,6 +29,8 @@ data class ModelRule(
     val to: Int,
     val label: String?,
     val map: Map<String, String>,
+    /** Production years of the generation, by the same code ("5R" -> "2012–2020"). */
+    val years: Map<String, String> = emptyMap(),
 )
 
 data class MakeRules(val years: List<YearRule>, val models: List<ModelRule>)
@@ -107,7 +109,12 @@ class VinRules private constructor(
                             is JSONObject -> m.keys().asSequence().associateWith { m.getString(it) }
                             else -> emptyMap()
                         }
-                        ModelRule(condition(r.optJSONObject("if")), from, to, r.optString("label").takeIf { it.isNotEmpty() }, map)
+                        val years = when (val y = r.opt("years")) {
+                            is String -> maps[y].orEmpty()
+                            is JSONObject -> y.keys().asSequence().associateWith { y.getString(it) }
+                            else -> emptyMap()
+                        }
+                        ModelRule(condition(r.optJSONObject("if")), from, to, r.optString("label").takeIf { it.isNotEmpty() }, map, years)
                     }
                 }.orEmpty()
                 makes[name] = MakeRules(years, models)

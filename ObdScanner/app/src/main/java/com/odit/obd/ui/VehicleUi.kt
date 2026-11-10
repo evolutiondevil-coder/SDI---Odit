@@ -62,7 +62,8 @@ fun VehicleRows(v: VehicleIdentity, showSources: Boolean = false) {
     }
     when {
         v.year != null -> KeyValue("Година", fieldText(v.year))
-        v.yearNote != null && v.vin != null -> KeyValue("Година", "не се вижда от VIN")
+        v.modelYears != null -> KeyValue("Година", "между ${v.modelYears} (по модела)")
+        v.vin != null && v.make != null -> KeyValue("Година", "не се вижда от VIN")
     }
     if (showSources && v.yearNote != null) KeyValue("", v.yearNote)
     v.engine?.let { KeyValue("Двигател", fieldText(it)) }

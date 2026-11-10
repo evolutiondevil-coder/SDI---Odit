@@ -31,6 +31,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,7 +50,8 @@ import androidx.compose.ui.unit.dp
 import java.util.Locale
 
 @Composable
-fun HomeScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
+fun HomeScreen(vm: MainViewModel, snackbar: SnackbarHostState, onExportLog: () -> Unit) {
+    var showAttempts by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
     var confirmExit by remember { mutableStateOf(false) }
     var editVin by remember { mutableStateOf(false) }
@@ -83,14 +86,49 @@ fun HomeScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
                 InfoCard(color = Palette.Warn.copy(alpha = 0.15f)) {
                     Text("Няма връзка с автомобила", color = Palette.Warn, fontWeight = FontWeight.SemiBold)
                     Text(err, style = MaterialTheme.typography.bodySmall)
-                    Button(onClick = { vm.retryVehicle() }, enabled = vm.busy == null) { Text("Опитай отново") }
+                    vm.connectDiagnosis?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                    if (vm.overview.vin == null) {
+                        VinInlineEntry(
+                            vm,
+                            "Въведете VIN, за да се разпознае колата (марка, модел, години) и да се опита подходящата връзка:",
+                        )
+                    }
+                    Button(onClick = { vm.retryVehicle() }, enabled = vm.busy == null, modifier = Modifier.fillMaxWidth()) {
+                        Text("Опитай отново")
+                    }
+                    OutlinedButton(
+                        onClick = { vm.open(Screen.MODULES); vm.scanKLine() },
+                        enabled = vm.busy == null,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Директна връзка (стари коли, K-line)") }
+                    Text(
+                        "Директната връзка е експериментална: търси компютрите на колата по стария K-line протокол, " +
+                            "когато тя няма OBD2. Чете и изтрива грешки, без данни на живо.",
+                        color = Palette.Muted,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        TextButton(onClick = onExportLog, contentPadding = PaddingValues(0.dp)) { Text("Изпрати лога") }
+                        TextButton(onClick = { showAttempts = !showAttempts }, contentPadding = PaddingValues(0.dp)) {
+                            Text(if (showAttempts) "Скрий подробностите" else "Подробности")
+                        }
+                    }
+                    if (showAttempts) {
+                        for (a in vm.connectAttempts) {
+                            Text(
+                                "${a.protocol.title}: ${a.answer} (${"%.1f".format(Locale.US, a.ms / 1000.0)} с)",
+                                color = Palette.Muted,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
                 }
             }
 
             val ready = vm.vehicleReady
             TileRow(
                 Tile("Грешки на двигателя", "Четене (OBD)", Icons.Filled.Warning, Palette.Bad, ready) { vm.open(Screen.DTC) },
-                Tile("Всички модули", "ABS, Airbag, табло…", Icons.Filled.Build, Palette.Primary, ready) { vm.open(Screen.MODULES) },
+                Tile("Всички модули", "ABS, Airbag, табло…", Icons.Filled.Build, Palette.Primary, vm.adapterReady) { vm.open(Screen.MODULES) },
             )
             TileRow(
                 Tile("Изтрий грешките", "Двигател (OBD)", Icons.Filled.Delete, Palette.Warn, ready) {
@@ -174,12 +212,11 @@ private fun VehicleCard(vm: MainViewModel, onEditVin: () -> Unit, onEditCar: () 
             vinOrigin(o, vm.modules.modules)?.let { KeyValue("", it) }
         } else if (vm.vehicleReady && vm.busy == null) {
             KeyValue("VIN", "не е намерен")
+            VinInlineEntry(vm, "Колата не съобщи VIN. Въведете го, за да се разпознае (стикер в рамката на вратата или талона):")
         }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            if (vm.vehicleReady && vm.busy == null && (o.vin == null || o.vinManual)) {
-                TextButton(onClick = onEditVin, contentPadding = PaddingValues(0.dp)) {
-                    Text(if (o.vin == null) "Въведи VIN ръчно" else "Промени VIN")
-                }
+            if (vm.busy == null && o.vin != null && o.vinManual) {
+                TextButton(onClick = onEditVin, contentPadding = PaddingValues(0.dp)) { Text("Промени VIN") }
             }
             if (vm.car != null) {
                 TextButton(onClick = onEditCar, contentPadding = PaddingValues(0.dp)) { Text("Поправи данните") }

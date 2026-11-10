@@ -23,6 +23,8 @@ data class VehicleIdentity(
     val group: Brand = Brand.OTHER,
     /** Why the year is not shown (e.g. the make does not encode it). */
     val yearNote: String? = null,
+    /** Production years of the recognised generation ("2012–2020"), when the exact year is unknown. */
+    val modelYears: String? = null,
 ) {
     /** "Volkswagen Golf V 2008" for searches and titles; only values that are known. */
     val shortName: String
@@ -68,6 +70,7 @@ class VehicleDecoder(private val wmi: WmiDb, private val rules: VinRules) {
         val country = entry?.country ?: wmi.country(vin)
 
         var model: Field<String>? = null
+        var modelYears: String? = null
         for (rule in rules.forMake(makeName)?.models.orEmpty()) {
             if (rule.condition != null && !rule.condition.matches(vin)) continue
             if (vin.length < rule.to) continue
@@ -75,6 +78,7 @@ class VehicleDecoder(private val wmi: WmiDb, private val rules: VinRules) {
             val name = rule.map[code] ?: continue
             val label = rule.label?.let { " ($it $code)" }.orEmpty()
             model = Field(name, Confidence.PROBABLE, "VIN позиции ${rule.from}–${rule.to}$label")
+            modelYears = rule.years[code]
             break
         }
 
@@ -98,6 +102,7 @@ class VehicleDecoder(private val wmi: WmiDb, private val rules: VinRules) {
             year = year,
             group = entry?.group ?: com.odit.obd.obd.Brand.OTHER,
             yearNote = note,
+            modelYears = modelYears,
         )
     }
 
@@ -122,8 +127,9 @@ class VehicleDecoder(private val wmi: WmiDb, private val rules: VinRules) {
         return id.copy(
             make = make,
             model = id.model ?: o.model?.let { Field(it, Confidence.ONLINE, src) },
-            // vPIC reads position 10 by the North American rule; useless where the make does not encode a year there.
-            year = id.year ?: o.year?.takeIf { yearPolicy != YearPolicy.NONE }?.let { Field(it, Confidence.ONLINE, src) },
+            // The online decoder reads position 10 by the North American rule. That is only right when it
+            // also recognised the model (the VIN matches a US-market pattern); otherwise the "year" is noise.
+            year = id.year ?: o.year?.takeIf { o.model != null }?.let { Field(it, Confidence.ONLINE, src) },
             engine = id.engine ?: o.engine?.let { Field(it, Confidence.ONLINE, src) },
             group = if (id.group == Brand.OTHER && make != null) wmi.groupForMake(make.value) else id.group,
         )
@@ -136,6 +142,7 @@ class VehicleDecoder(private val wmi: WmiDb, private val rules: VinRules) {
             year = user.year?.let { Field(it, Confidence.USER, "въведено ръчно") } ?: id.year,
             engine = user.engine?.let { Field(it, Confidence.USER, "въведено ръчно") } ?: id.engine,
             yearNote = if (user.year != null) null else id.yearNote,
+            modelYears = if (user.year != null || user.model != null) null else id.modelYears,
         )
     }
 }

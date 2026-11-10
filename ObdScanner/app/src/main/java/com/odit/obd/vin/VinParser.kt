@@ -9,6 +9,7 @@ enum class VinMethod(val title: String) {
     OBD_0902("OBD 09 02"),
     UDS_F190("UDS 22 F190"),
     KWP_1A90("KWP 1A 90"),
+    KLINE("K-line (KWP)"),
     MANUAL("въведен ръчно"),
 }
 

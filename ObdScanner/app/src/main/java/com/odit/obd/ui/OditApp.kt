@@ -40,7 +40,7 @@ fun OditApp(
 
     when (vm.screen) {
         Screen.CONNECT -> ConnectScreen(vm, snackbar, withBluetooth)
-        Screen.HOME -> HomeScreen(vm, snackbar)
+        Screen.HOME -> HomeScreen(vm, snackbar, onExportLog)
         Screen.DTC -> DtcScreen(vm, snackbar, onShare, onSearch)
         Screen.MODULES -> ModulesScreen(vm, snackbar, onShare, onSearch)
         Screen.LIVE -> LiveScreen(vm, snackbar)

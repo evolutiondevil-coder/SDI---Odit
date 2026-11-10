@@ -100,7 +100,9 @@ object ResponseParser {
             val b = bytes(line)
             if (b.size < 5) continue
             val source = "%02X".format(b[2])
-            result += EcuMessage(source, b.copyOfRange(3, b.size - 1))
+            // KWP2000 with a separate length byte (format byte 0x80 / 0xC0 has no length in it).
+            val start = if (b[0] and 0x3F == 0 && b[0] and 0x80 != 0 && b.size >= 6) 4 else 3
+            result += EcuMessage(source, b.copyOfRange(start, b.size - 1))
         }
         return result
     }

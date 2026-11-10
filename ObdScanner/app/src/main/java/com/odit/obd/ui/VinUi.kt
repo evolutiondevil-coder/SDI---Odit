@@ -1,9 +1,13 @@
 package com.odit.obd.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -13,7 +17,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -98,4 +104,36 @@ fun VinDialog(initial: String, onSave: (String) -> String?, onDismiss: () -> Uni
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отказ") } },
     )
+}
+
+/**
+ * VIN field shown right where it is needed: when the car reported no VIN, or did not answer at all.
+ * The VIN identifies the car (make, model, years) and brings back what the garage knows about it.
+ */
+@Composable
+fun VinInlineEntry(vm: MainViewModel, hint: String) {
+    var text by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    Text(hint, style = MaterialTheme.typography.bodySmall)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it.uppercase().filter { c -> c.isLetterOrDigit() }.take(17); error = null },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+            label = { Text("VIN ${text.length}/17") },
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+        )
+        Button(onClick = { error = vm.setManualVin(text) }, enabled = text.length == 17) { Text("Търси") }
+    }
+    error?.let { Text(it, color = Palette.Bad, style = MaterialTheme.typography.bodySmall) }
+    if (vm.vinSuggestions.isNotEmpty()) {
+        Text("Въвеждани преди с този адаптер:", color = Palette.Muted, style = MaterialTheme.typography.bodySmall)
+        for (v in vm.vinSuggestions) {
+            TextButton(onClick = { error = vm.setManualVin(v) }, contentPadding = PaddingValues(0.dp)) {
+                Text(v, fontFamily = FontFamily.Monospace)
+            }
+        }
+    }
 }

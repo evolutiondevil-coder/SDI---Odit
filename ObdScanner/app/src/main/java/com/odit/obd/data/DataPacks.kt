@@ -2,6 +2,7 @@ package com.odit.obd.data
 
 import com.odit.obd.obd.Brand
 import com.odit.obd.obd.DtcDatabase
+import com.odit.obd.uds.KLineTarget
 import com.odit.obd.uds.ModuleAddress
 import com.odit.obd.uds.ModuleCatalog
 import com.odit.obd.vehicle.VinRules
@@ -45,6 +46,7 @@ class DataPacks(
 
             source.read("modules")?.let { j ->
                 runCatching { ModuleCatalog.packGroups = modules(JSONObject(j)) }
+                runCatching { ModuleCatalog.packKLine = kLine(JSONObject(j)) }
                 info(j)
             }
             return DataPacks(
@@ -57,6 +59,19 @@ class DataPacks(
         private fun codes(o: JSONObject): Map<String, String> {
             val c = o.getJSONObject("data").getJSONObject("codes")
             return c.keys().asSequence().associate { it.uppercase() to c.getString(it) }
+        }
+
+        private fun kLine(o: JSONObject): Map<String, List<KLineTarget>> {
+            val g = o.getJSONObject("data").optJSONObject("kline") ?: return emptyMap()
+            val out = HashMap<String, List<KLineTarget>>()
+            for (k in g.keys()) {
+                val a = g.getJSONArray(k)
+                out[k] = (0 until a.length()).map { i ->
+                    val m = a.getJSONObject(i)
+                    KLineTarget(m.getString("addr").toInt(16), m.optString("name").ifEmpty { null })
+                }
+            }
+            return out
         }
 
         private fun modules(o: JSONObject): Map<Brand, List<ModuleAddress>> {

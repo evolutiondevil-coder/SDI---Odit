@@ -3,7 +3,12 @@ package com.odit.obd
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Looper
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -119,13 +124,14 @@ class AppFlowTest {
         shot("06_readiness")
         back()
 
-        compose.onNodeWithText("Изтрий грешките").performClick()
-        waitForText("Изтриване на грешките?")
-        compose.onNodeWithText("Изтрий").performClick()
-        pump()
-        waitForText("Лампата на двигателя не свети")
-        waitWhileBusy("Изтриване")
+        clearFromHome()
+        // The list is emptied and the result stays on the screen (plural for several codes).
+        waitForText("Грешките са изтрити (4).")
+        waitForText("Постоянните грешки (1) не се изтриват с уред")
+        assertTrue(compose.onAllNodesWithText("P0171").fetchSemanticsNodes().isEmpty())
         shot("07_after_clear")
+        back()
+        waitForText("Лампата на двигателя не свети")
     }
 
     /** The first-run "Онлайн помощ" question (shown only while it has not been answered). */
@@ -204,5 +210,90 @@ class AppFlowTest {
         waitForText("KWP 1A 90")
         waitForText("Renault")
         shot("15_kline")
+    }
+
+    private fun clearFromHome() {
+        compose.onNodeWithText("Изтрий грешките").performClick()
+        waitForText("Изтриване на грешките?")
+        compose.onNodeWithText("Изтрий").performClick()
+        pump()
+        waitWhileBusy("Изтриване")
+        waitWhileBusy("Проверка на модулите")
+        waitWhileBusy("Четене")
+    }
+
+    /** Scrolls the lazy list of the current screen to a button and taps it. */
+    private fun clickInList(text: String) {
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(text))
+        pump()
+        compose.onNodeWithText(text).performClick()
+        pump()
+    }
+
+    @Test
+    fun clearedModuleRowsDisappear() {
+        startDemo("Обикновен автомобил", online = false)
+        compose.onNodeWithText("Всички модули").performClick()
+        click("Бързо")
+        waitForText("Намерени модули: 7 · с грешки: 6")
+        clickInList("Изтрий грешките във всички модули")
+        waitForText("Изтриване в 6 модула?")
+        compose.onNodeWithText("Изтрий").performClick()
+        pump()
+        waitWhileBusy("Изтриване")
+        waitWhileBusy("Четене")
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Грешките са изтрити (7)."))
+        waitForText("Намерени модули: 7 · с грешки: 0")
+        assertTrue(compose.onAllNodesWithText("Изтрий грешките в този модул").fetchSemanticsNodes().isEmpty())
+        shot("16_modules_cleared")
+    }
+
+    @Test
+    fun activeFaultIsShownAsReturned() {
+        startDemo("Активна повреда", online = false)
+        clearFromHome()
+        waitForText("Изтрити: 3. Върнаха се веднага: 1")
+        waitForText("Върна се веднага след изтриването")
+        waitForText("P0301")
+        assertTrue(compose.onAllNodesWithText("P0171").fetchSemanticsNodes().isEmpty())
+        shot("17_fault_returned")
+    }
+
+    @Test
+    fun oldCarVinFieldAndDirectKLine() {
+        answerIntro(false)
+        click("Демо режим (без автомобил)")
+        waitForText("Стара кола без OBD2")
+        compose.onNodeWithText("Симулирай интернет (онлайн помощ)").performClick()
+        pump()
+        compose.onNodeWithText("Стара кола без OBD2").performClick()
+        pump()
+        waitForText("Няма връзка с автомобила", timeoutMs = 300_000)
+        waitForText("най-вероятно колата е отпреди OBD2")
+        shot("18_old_car_not_found")
+
+        // The VIN field is right there; the VIN identifies the car.
+        compose.onNode(hasSetTextAction()).performTextInput("VF1JA0B0521234567")
+        pump()
+        compose.onNodeWithText("Търси").performClick()
+        pump()
+        waitForText("Scénic I (вероятно)")
+        waitForText("между 1996–2003 (по модела)")
+        shot("19_old_car_identified")
+
+        click("Директна връзка (стари коли, K-line)")
+        waitForText("Намерени модули: 3 · с грешки: 2", timeoutMs = 300_000)
+        waitForText("DTC 0120")
+        waitForText("Двигател (впръскване)")
+        shot("20_old_car_modules")
+
+        clickInList("Изтрий грешките във всички модули")
+        waitForText("Изтриване в 2 модула?")
+        compose.onNodeWithText("Изтрий").performClick()
+        pump()
+        waitWhileBusy("Изтриване")
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Грешките са изтрити (3)."))
+        waitForText("Намерени модули: 3 · с грешки: 0")
+        shot("21_old_car_cleared")
     }
 }

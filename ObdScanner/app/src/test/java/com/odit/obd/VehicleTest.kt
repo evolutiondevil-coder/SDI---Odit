@@ -98,13 +98,45 @@ class VehicleTest {
     }
 
     @Test
-    fun unknownRulesGiveProbableYearOnly() {
-        val id = decoder.decode("VF1BB0A0526123456", currentYear = 2026)
-        assertEquals("Renault", id.make?.value)
-        assertNull(id.model)
-        assertEquals(Confidence.PROBABLE, id.year?.confidence)
+    fun renaultYearIsNeverReadFromPosition10() {
+        // Position 10 is the first digit of the serial number: a 2014 Clio IV would read as "2004".
+        val clio = decoder.decode("VF15R0G0H41234567", currentYear = 2026)
+        assertEquals("Renault", clio.make?.value)
+        assertEquals("Clio IV", clio.model?.value)
+        assertEquals(Confidence.PROBABLE, clio.model?.confidence)
+        assertNull(clio.year)
+        assertEquals("2012–2020", clio.modelYears)
+        assertNotNull(clio.yearNote)
+
+        val scenic = decoder.decode("VF1JA0B0521234567", currentYear = 2026)
+        assertEquals("Scénic I", scenic.model?.value)
+        assertEquals("1996–2003", scenic.modelYears)
+        assertNull(scenic.year)
+
+        val megane = decoder.decode("VF1BM0C0H31234567")
+        assertEquals("Mégane II", megane.model?.value)
+        assertEquals("2002–2008", megane.modelYears)
+
+        val duster = decoder.decode("UU1HSDAG547123456")
+        assertEquals("Dacia", duster.make?.value)
+        assertEquals("Duster I", duster.model?.value)
+        assertNull(duster.year)
+    }
+
+    @Test
+    fun noYearGuessForMakesWithoutARule() {
+        // No documented rule for BMW: better no year than a wrong one.
+        assertNull(decoder.decode("WBA3B1C50EK000001", currentYear = 2026).year)
+        // Documented makes are still shown, as probable.
+        val volvo = decoder.decode("YV1MZ79L082123456", currentYear = 2026)
+        assertEquals(2008, volvo.year?.value)
+        assertEquals(Confidence.PROBABLE, volvo.year?.confidence)
         // Position 10 = 0 is not a year at all.
         assertNull(decoder.decode("ZFA19900000000001").year)
+        // A year typed by the user replaces the range.
+        val fixed = decoder.decode("VF15R0G0H41234567", UserVehicle(year = 2014))
+        assertEquals(2014, fixed.year?.value)
+        assertNull(fixed.modelYears)
     }
 
     @Test

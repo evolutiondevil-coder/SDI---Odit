@@ -23,7 +23,7 @@ class HttpResult(val code: Int, val body: ByteArray?) {
 class HttpClient(
     private val connectTimeoutMs: Int = 4_000,
     private val readTimeoutMs: Int = 6_000,
-    private val userAgent: String = "OditOBD/1.1 (Android)",
+    private val userAgent: String = "OditOBD (Android)",
 ) {
     suspend fun get(url: String, maxBytes: Int = 4_000_000): HttpResult = withContext(Dispatchers.IO) {
         var conn: HttpURLConnection? = null
