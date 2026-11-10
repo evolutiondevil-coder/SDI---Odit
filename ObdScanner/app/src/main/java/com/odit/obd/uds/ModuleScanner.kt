@@ -51,6 +51,8 @@ class ModuleScanner(private val s: ObdSession) {
         brand: Brand,
         onProgress: (done: Int, total: Int, label: String) -> Unit,
         onFound: (FoundModule) -> Unit,
+        /** Only these addresses (the modules this car had last time), instead of the quick/full list. */
+        only: List<ModuleAddress>? = null,
     ): List<FoundModule> {
         if (!s.protocol.isCan) {
             throw IOException(
@@ -62,7 +64,7 @@ class ModuleScanner(private val s: ObdSession) {
         try {
             prepare()
             if (s.protocol.is29bit) {
-                val list = ModuleCatalog.addresses29(full)
+                val list = only?.map { it.tx } ?: ModuleCatalog.addresses29(full)
                 for ((i, addr) in list.withIndex()) {
                     currentCoroutineContext().ensureActive()
                     onProgress(i, list.size, "18DA%02XF1".format(addr))
@@ -73,7 +75,7 @@ class ModuleScanner(private val s: ObdSession) {
                     }
                 }
             } else {
-                val list = if (full) ModuleCatalog.fullList(brand) else ModuleCatalog.quickList(brand)
+                val list = only ?: if (full) ModuleCatalog.fullList(brand) else ModuleCatalog.quickList(brand)
                 for ((i, a) in list.withIndex()) {
                     currentCoroutineContext().ensureActive()
                     onProgress(i, list.size, "0x%03X".format(a.tx))

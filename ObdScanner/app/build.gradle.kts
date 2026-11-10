@@ -51,11 +51,23 @@ android {
         compose = true
         buildConfig = true
     }
+    // The data packs (WMI, VIN rules, trouble codes...) live in ../../odit-data so they can also be
+    // published for download; the same files are bundled into the APK as the offline baseline.
+    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/oditData"))
+
     testOptions {
         unitTests.isReturnDefaultValues = true
         unitTests.isIncludeAndroidResources = true
     }
 }
+
+val copyOditData by tasks.registering(Copy::class) {
+    from(rootProject.file("../odit-data")) {
+        include("manifest.json", "packs/*.json")
+    }
+    into(layout.buildDirectory.dir("generated/oditData/odit-data"))
+}
+tasks.named("preBuild") { dependsOn(copyOditData) }
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2025.05.01")
@@ -70,6 +82,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     testImplementation("junit:junit:4.13.2")
+    // Real org.json for plain JVM tests (Android's copy is only a stub there).
+    testImplementation("org.json:json:20240303")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     // UI flow test: runs the real app in demo mode on Robolectric and saves screenshots.
     testImplementation("org.robolectric:robolectric:4.14.1")

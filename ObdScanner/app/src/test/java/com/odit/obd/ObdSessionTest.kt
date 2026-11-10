@@ -11,7 +11,6 @@ import com.odit.obd.obd.DtcKind
 import com.odit.obd.obd.ObdSession
 import com.odit.obd.obd.Pids
 import com.odit.obd.obd.Readiness
-import com.odit.obd.obd.VinDecoder
 import com.odit.obd.sim.SimulatedElm
 import com.odit.obd.uds.DiagType
 import com.odit.obd.uds.ModuleScanner
@@ -134,10 +133,6 @@ class ObdSessionTest {
     fun readsVinAndIdentity() = runBlocking {
         val (s, sim) = connected()
         assertEquals(sim.vin, s.readVin())
-        val info = VinDecoder.decode(sim.vin)
-        assertEquals("Volkswagen", info.make)
-        assertEquals(2008, info.year)
-        assertEquals(Brand.VAG, info.brand)
         val ids = s.identities()
         assertEquals("ECM-EngineControl", ids.first { it.ecu == "7E8" }.name)
     }

@@ -29,8 +29,6 @@ import com.odit.obd.obd.PidDef
 import com.odit.obd.obd.Pids
 import com.odit.obd.obd.Readiness
 import com.odit.obd.obd.VehicleNotRespondingException
-import com.odit.obd.obd.VinDecoder
-import com.odit.obd.obd.VinInfo
 import com.odit.obd.sim.DemoScenario
 import com.odit.obd.sim.SimulatedElm
 import com.odit.obd.vin.VinParser
@@ -38,6 +36,21 @@ import com.odit.obd.vin.VinReader
 import com.odit.obd.vin.VinReport
 import com.odit.obd.BuildConfig
 import com.odit.obd.uds.FoundModule
+import com.odit.obd.uds.ModuleAddress
+import com.odit.obd.data.AppPackSource
+import com.odit.obd.data.PackInfo
+import com.odit.obd.garage.CarRecord
+import com.odit.obd.garage.Garage
+import com.odit.obd.garage.SavedModule
+import com.odit.obd.garage.ScanRecord
+import com.odit.obd.vehicle.UserVehicle
+import com.odit.obd.vehicle.VehicleDecoder
+import com.odit.obd.vehicle.VehicleIdentity
+import com.odit.obd.vehicle.VinRules
+import com.odit.obd.vehicle.WmiDb
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 import com.odit.obd.uds.ModuleScanner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -49,7 +62,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-enum class Screen { CONNECT, HOME, DTC, MODULES, LIVE, READINESS, FREEZE, INFO, TERMINAL }
+enum class Screen { CONNECT, HOME, DTC, MODULES, LIVE, READINESS, FREEZE, INFO, TERMINAL, GARAGE }
 
 enum class LinkMode(val title: String) { AUTO("Авто"), BLE("BLE"), CLASSIC("Класически") }
 
@@ -64,7 +77,6 @@ data class SavedDevice(val address: String, val name: String)
 
 data class Overview(
     val vin: String? = null,
-    val vinInfo: VinInfo? = null,
     val voltage: Double? = null,
     val readiness: Readiness? = null,
     /** Every VIN the car reported, and from where. */
@@ -164,6 +176,41 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** One-shot message for the snackbar. */
     var message by mutableStateOf<String?>(null)
 
+    // ------------------------------------------------------------ car data
+    private val packs = AppPackSource(app)
+    @Volatile private var wmiDb: WmiDb = WmiDb.EMPTY
+    @Volatile private var vinRules: VinRules = VinRules.EMPTY
+    private val decoder: VehicleDecoder get() = VehicleDecoder(wmiDb, vinRules)
+    private val realGarage = Garage(File(app.filesDir, "garage"))
+    private val demoGarage = Garage(File(app.cacheDir, "demo-garage"))
+    private val garage: Garage get() = if (demo) demoGarage else realGarage
+
+    /** Make, model, year… of the connected car, with how sure each value is. */
+    var vehicle by mutableStateOf(VehicleIdentity.UNKNOWN)
+        private set
+
+    /** The garage entry of the connected car. */
+    var car by mutableStateOf<CarRecord?>(null)
+        private set
+
+    /** All cars in the garage (real ones, not demo cars). */
+    var garageCars by mutableStateOf<List<CarRecord>>(emptyList())
+        private set
+
+    init {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                wmiDb = runCatching { WmiDb.parse(packs.read("wmi")) }.getOrDefault(WmiDb.EMPTY)
+                vinRules = runCatching { VinRules.parse(packs.read("vin-rules")) }.getOrDefault(VinRules.EMPTY)
+            }
+            refreshGarage()
+            recomputeVehicle()
+        }
+    }
+
+    /** Titles of the bundled / downloaded data packs and their sources (shown in "Информация"). */
+    fun dataSources(): List<PackInfo> = listOfNotNull(wmiDb.info, vinRules.info)
+
     private var transport: ObdTransport? = null
     private var session: ObdSession? = null
     private var connectJob: Job? = null
@@ -172,12 +219,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val bluetoothAvailable: Boolean get() = btAdapter != null
     val vehicleReady: Boolean get() = session?.vehicleConnected == true
-    private val brand: Brand get() = overview.vinInfo?.brand ?: Brand.OTHER
+    private val brand: Brand get() = vehicle.group
 
     // ------------------------------------------------------------- navigation
 
     fun open(target: Screen) {
-        val needsVehicle = target !in setOf(Screen.CONNECT, Screen.HOME, Screen.TERMINAL, Screen.INFO)
+        val needsVehicle = target !in setOf(Screen.CONNECT, Screen.HOME, Screen.TERMINAL, Screen.INFO, Screen.GARAGE)
         if (needsVehicle && !vehicleReady) {
             message = "Няма връзка с автомобила. Включете запалването и натиснете „Опитай отново“."
             return
@@ -190,13 +237,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             Screen.READINESS -> loadReadiness()
             Screen.FREEZE -> if (freeze.data == null) loadFreeze()
             Screen.INFO -> if (info.data == null) loadInfo()
+            Screen.GARAGE -> refreshGarage()
             else -> Unit
         }
+    }
+
+    /** The garage is reachable both before and after connecting. */
+    fun closeGarage() {
+        screen = if (session != null) Screen.HOME else Screen.CONNECT
     }
 
     /** Returns false when the system should handle back (leave the app). */
     fun back(): Boolean = when (screen) {
         Screen.CONNECT, Screen.HOME -> false
+        Screen.GARAGE -> {
+            closeGarage()
+            true
+        }
         else -> {
             open(Screen.HOME)
             true
@@ -245,6 +302,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun connectDemo(scenario: DemoScenario = DemoScenario.NORMAL) {
         stopScan()
         demoScenario = scenario
+        demoGarage.all().forEach { demoGarage.delete(it.id) }
         connectWith("демо: ${scenario.title}", listOf(LinkMode.AUTO), null) { SimulatedElm(scenario) }
     }
 
@@ -327,7 +385,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         vehicleError = null
         busy = "Свързване с автомобила…"
         try {
-            val preferred = prefs.getString("protocol", null)?.firstOrNull()?.let { ObdProtocol.fromCode(it) }
+            // The protocol of the car last seen with this adapter is tried first (faster reconnect).
+            val fromGarage = lastDevice?.address?.takeIf { !demo }?.let { garage.lastForAdapter(it)?.protocol }
+            val preferred = (fromGarage ?: prefs.getString("protocol", null)?.firstOrNull())?.let { ObdProtocol.fromCode(it) }
             val p = s.connectVehicle(if (demo) null else preferred) { step -> busy = step }
             protocol = p
             if (!demo) prefs.edit().putString("protocol", p.code.toString()).apply()
@@ -378,11 +438,60 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val vin = report.vin ?: manual
         overview = overview.copy(
             vin = vin,
-            vinInfo = vin?.let { VinDecoder.decode(it) },
             vinReport = report,
             vinManual = report.vin == null && manual != null,
         )
+        attachCar(vin)
     }
+
+    /** Finds or creates the garage entry for the connected car and refreshes what is known about it. */
+    private fun attachCar(vin: String?) {
+        val adapter = if (demo) "demo" else lastDevice?.address
+        val id = vin?.let { CarRecord.idForVin(it) } ?: adapter?.let { CarRecord.idForAdapter(it) } ?: return
+        val existing = garage.get(id)
+        val record = (existing ?: CarRecord(id, vin, if (vin == null) "Автомобил без VIN" else null, adapter)).copy(
+            adapter = adapter,
+            protocol = protocol?.code ?: existing?.protocol,
+            lastSeen = System.currentTimeMillis(),
+        )
+        runCatching { garage.save(record) }
+        car = record
+        recomputeVehicle()
+        refreshGarage()
+    }
+
+    private fun recomputeVehicle() {
+        vehicle = if (overview.vin == null && car == null) VehicleIdentity.UNKNOWN else decoder.decode(overview.vin, car?.user)
+    }
+
+    private fun updateCar(change: (CarRecord) -> CarRecord) {
+        val c = car ?: return
+        val updated = change(c)
+        runCatching { garage.save(updated) }
+        car = updated
+        refreshGarage()
+    }
+
+    private fun addHistory(kind: String, codes: List<String>, note: String? = null) =
+        updateCar { it.copy(history = (it.history + ScanRecord(System.currentTimeMillis(), kind, codes, note)).takeLast(Garage.MAX_HISTORY)) }
+
+    fun refreshGarage() {
+        garageCars = runCatching { realGarage.all() }.getOrDefault(emptyList())
+    }
+
+    /** Saves the user's corrections (empty fields clear a correction). */
+    fun saveUserVehicle(user: UserVehicle) {
+        updateCar { it.copy(user = user) }
+        recomputeVehicle()
+    }
+
+    fun deleteCar(id: String) {
+        runCatching { realGarage.delete(id) }
+        refreshGarage()
+    }
+
+    /** Identity of a garage car without connecting (for the garage screen). */
+    fun identityOf(c: CarRecord): VehicleIdentity = decoder.decode(c.vin, c.user)
 
     /** Returns an error text, or null when the VIN was accepted. */
     fun setManualVin(input: String): String? {
@@ -408,6 +517,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             "adapter" to listOf(adapterVersion, linkDescription).filter { it.isNotBlank() }.joinToString(" · "),
             "protocol" to (protocol?.let { "${it.code} ${it.title}" } ?: "—"),
             "vin" to (overview.vin ?: "—"),
+            "vehicle" to vehicle.shortName.ifBlank { "—" },
             "vin-sources" to overview.vinReport.found.joinToString { "${it.ecu}/${it.method.name}=${it.vin}" }.ifEmpty { "—" },
             "android" to "${android.os.Build.VERSION.RELEASE} (${android.os.Build.MODEL})",
         ),
@@ -438,6 +548,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         protocol = null
         vehicleError = null
         overview = Overview()
+        vehicle = VehicleIdentity.UNKNOWN
+        car = null
         dtc = DtcUi()
         modules = ModulesUi()
         live = LiveUi()
@@ -487,6 +599,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val pending = s.readDtcs(0x07)
             val permanent = runCatching { s.readDtcs(0x0A) }.getOrDefault(emptyList())
             dtc = DtcUi(loading = false, loaded = true, stored = stored, pending = pending, permanent = permanent)
+            addHistory(ScanRecord.OBD, (stored + pending).map { it.dtc.code }.distinct())
         }
         if (!started) dtc = dtc.copy(loading = false)
     }
@@ -495,6 +608,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         op("Изтриване на грешките…") { s ->
             val result = s.clearDtcs()
             message = result.message
+            if (result.ok) addHistory(ScanRecord.CLEAR, dtc.stored.map { it.dtc.code }, "OBD")
             delay(500)
             val stored = s.readDtcs(0x03)
             val pending = s.readDtcs(0x07)
@@ -507,17 +621,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // --------------------------------------------------------------- modules
 
-    fun scanModules(full: Boolean) {
+    /** Modules this car had last time (from the garage). */
+    val knownModules: List<SavedModule> get() = car?.modules.orEmpty()
+
+    fun scanModules(full: Boolean, knownOnly: Boolean = false) {
         modules = ModulesUi(scanning = true)
+        val only = if (knownOnly) knownModules.map { ModuleAddress(it.tx, it.rx, it.name) } else null
         val started = op(if (full) "Пълно сканиране на модулите…" else "Сканиране на модулите…",
             onError = { modules = modules.copy(scanning = false, error = it) }) { s ->
             try {
                 val found = ModuleScanner(s).scan(
-                    full, brand,
+                    full, brand, only = only,
                     onProgress = { done, total, label -> modules = modules.copy(done = done, total = total, current = label) },
                     onFound = { m -> modules = modules.copy(modules = modules.modules + m) },
                 )
                 modules = modules.copy(scanning = false, finished = true, modules = found)
+                updateCar { it.copy(modules = Garage.fromModules(found)) }
+                addHistory(ScanRecord.MODULES, found.flatMap { m -> m.dtcs.map { it.displayCode } }.distinct(), "${found.size} модула")
                 val before = overview.vinReport
                 if (before.vin == null && s.protocol.isCan) {
                     // The VIN may only be stored in a module the scan just found.
@@ -548,6 +668,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (!r.ok) failures += "${m.title}: ${r.message}"
             }
             modules = modules.copy(modules = current)
+            if (failures.size < list.size) addHistory(ScanRecord.CLEAR, list.flatMap { m -> m.dtcs.map { it.displayCode } }, "модули")
             message = if (failures.isEmpty()) "Грешките са изтрити." else failures.joinToString("\n")
         }
     }
@@ -666,9 +787,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun buildReport(): String = buildString {
         val now = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US).format(Date())
         appendLine("Odit OBD — диагностичен отчет ($now)")
-        overview.vinInfo?.let { v ->
-            appendLine("Автомобил: ${listOfNotNull(v.make, v.year?.toString()).joinToString(", ").ifEmpty { "—" }}")
-        }
+        vehicle.shortName.ifBlank { null }?.let { appendLine("Автомобил: $it") }
         overview.vin?.let { appendLine("VIN: $it") }
         protocol?.let { appendLine("Протокол: ${it.title}") }
         overview.voltage?.let { appendLine("Напрежение: %.1f V".format(Locale.US, it)) }

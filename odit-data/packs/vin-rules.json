@@ -1,0 +1,392 @@
+{
+ "id": "vin-rules",
+ "version": 1,
+ "schema": 1,
+ "title": "Правила за модел и година по VIN",
+ "sources": [
+  {
+   "name": "Wikibooks: Vehicle Identification Numbers (VIN codes) — Volkswagen, Audi, Mercedes-Benz, Peugeot, Ford (European Ford), Model year",
+   "url": "https://en.wikibooks.org/wiki/Vehicle_Identification_Numbers_(VIN_codes)",
+   "license": "CC BY-SA 4.0",
+   "retrieved": "2026-11-10"
+  },
+  {
+   "name": "Wikipedia: Vehicle identification number (model year encoding, 49 CFR 565) и статиите за моделите (Typ кодове на VAG)",
+   "url": "https://en.wikipedia.org/wiki/Vehicle_identification_number",
+   "license": "CC BY-SA 4.0",
+   "retrieved": "2026-11-10"
+  }
+ ],
+ "data": {
+  "yearCodes": "ABCDEFGHJKLMNPRSTVWXY123456789",
+  "northAmerica": {
+   "pos": 10,
+   "policy": "reliable"
+  },
+  "default": {
+   "pos": 10,
+   "policy": "probable",
+   "note": "При много европейски производители позиция 10 не е годината — проверете в талона."
+  },
+  "maps": {
+   "vw": {
+    "1G": "Golf II / Jetta II",
+    "1H": "Golf III / Vento",
+    "1E": "Golf III Cabrio",
+    "1J": "Golf IV / Bora",
+    "1K": "Golf V / Jetta V",
+    "5K": "Golf VI",
+    "AU": "Golf VII",
+    "CD": "Golf VIII",
+    "6K": "Polo III",
+    "6N": "Polo III",
+    "9N": "Polo IV",
+    "6R": "Polo V",
+    "3A": "Passat B4",
+    "3B": "Passat B5",
+    "3C": "Passat B6 / B7 / CC",
+    "1T": "Touran I",
+    "5T": "Touran II",
+    "2K": "Caddy III / IV",
+    "9K": "Caddy II",
+    "SB": "Caddy V",
+    "5N": "Tiguan I",
+    "7M": "Sharan I",
+    "7N": "Sharan II",
+    "7L": "Touareg I",
+    "7P": "Touareg II",
+    "70": "Transporter T4",
+    "1C": "New Beetle",
+    "1Y": "New Beetle Cabrio",
+    "1F": "Eos",
+    "3D": "Phaeton",
+    "50": "Corrado",
+    "53": "Scirocco",
+    "2E": "Crafter I",
+    "SY": "Crafter II"
+   },
+   "audi": {
+    "8Z": "A2",
+    "8L": "A3 (8L)",
+    "8P": "A3 (8P)",
+    "8V": "A3 (8V)",
+    "8Y": "A3 (8Y)",
+    "8D": "A4 B5",
+    "8E": "A4 B6 / B7",
+    "8H": "A4 Cabriolet",
+    "8K": "A4 B8",
+    "8W": "A4 B9",
+    "4A": "A6 C4",
+    "4B": "A6 C5",
+    "4F": "A6 C6",
+    "4G": "A6 C7",
+    "4K": "A6 C8",
+    "8R": "Q5 I",
+    "FY": "Q5 II",
+    "4L": "Q7 I",
+    "4M": "Q7 II"
+   },
+   "skoda": {
+    "1U": "Octavia I",
+    "1Z": "Octavia II",
+    "5E": "Octavia III",
+    "NX": "Octavia IV",
+    "6Y": "Fabia I",
+    "5J": "Fabia II / Roomster",
+    "NJ": "Fabia III",
+    "PJ": "Fabia IV",
+    "3U": "Superb I",
+    "3T": "Superb II",
+    "3V": "Superb III",
+    "5L": "Yeti"
+   },
+   "seat": {
+    "6K": "Ibiza II / Córdoba",
+    "6L": "Ibiza III",
+    "6J": "Ibiza IV",
+    "6F": "Ibiza V",
+    "1M": "León I / Toledo II",
+    "1P": "León II",
+    "5F": "León III",
+    "1L": "Toledo I",
+    "5P": "Altea / Toledo III",
+    "7M": "Alhambra I",
+    "7N": "Alhambra II"
+   },
+   "mercedes": {
+    "168": "A-класа (W168)",
+    "169": "A-класа (W169)",
+    "176": "A-класа (W176)",
+    "177": "A-класа (W177)",
+    "245": "B-класа (W245)",
+    "246": "B-класа (W246)",
+    "242": "B-класа електрическа (N242)",
+    "247": "B-класа (W247)",
+    "117": "CLA (C117)",
+    "118": "CLA (C118)",
+    "156": "GLA (X156)",
+    "201": "190 (W201)",
+    "202": "C-класа (W202)",
+    "203": "C-класа (W203)",
+    "204": "C-класа (W204) / GLK (X204)",
+    "205": "C-класа (W205)",
+    "206": "C-класа (W206)",
+    "123": "W123",
+    "124": "E-класа (W124)",
+    "210": "E-класа (W210)",
+    "211": "E-класа (W211)",
+    "212": "E-класа (W212)",
+    "213": "E-класа (W213)",
+    "214": "E-класа (W214)",
+    "207": "E-класа купе/кабрио (C207)",
+    "238": "E-класа купе/кабрио (C238)",
+    "208": "CLK (C208)",
+    "209": "CLK (C209)",
+    "219": "CLS (C219)",
+    "218": "CLS (C218)",
+    "257": "CLS (C257)",
+    "126": "S-класа (W126)",
+    "140": "S-класа (W140)",
+    "220": "S-класа (W220)",
+    "221": "S-класа (W221)",
+    "222": "S-класа (W222)",
+    "223": "S-класа (W223)",
+    "215": "CL (C215)",
+    "216": "CL (C216)",
+    "217": "S-класа купе (C217)",
+    "163": "M-класа (W163)",
+    "164": "ML / GL (W164 / X164)",
+    "166": "ML / GLE / GL (W166 / X166)",
+    "167": "GLE / GLS (V167 / X167)",
+    "292": "GLE купе (C292)",
+    "253": "GLC (X253 / C253)",
+    "254": "GLC (X254)",
+    "251": "R-класа (V251)",
+    "463": "G-класа (W463)",
+    "170": "SLK (R170)",
+    "171": "SLK (R171)",
+    "172": "SLK / SLC (R172)",
+    "129": "SL (R129)",
+    "230": "SL (R230)",
+    "231": "SL (R231)",
+    "197": "SLS AMG (C197)",
+    "190": "AMG GT (C190)",
+    "414": "Vaneo",
+    "415": "Citan I",
+    "420": "Citan II",
+    "638": "Vito / V-класа (W638)",
+    "639": "Vito / Viano (W639)",
+    "447": "Vito / V-класа (W447)",
+    "470": "X-класа",
+    "901": "Sprinter T1N",
+    "902": "Sprinter T1N",
+    "903": "Sprinter T1N",
+    "904": "Sprinter T1N",
+    "905": "Sprinter T1N",
+    "906": "Sprinter (NCV3)",
+    "907": "Sprinter (VS30)",
+    "910": "Sprinter (VS30)"
+   },
+   "peugeot": {
+    "2": "206",
+    "3": "307",
+    "4": "308",
+    "6": "407",
+    "7": "306 / Partner",
+    "8": "406 / 508",
+    "9": "308",
+    "B": "Expert",
+    "C": "208",
+    "D": "301",
+    "U": "2008",
+    "M": "3008"
+   },
+   "ford-eu": {
+    "A": "Escort / Orion",
+    "B": "Mondeo / Cougar / C-Max (или по-стари Sierra, Taunus)",
+    "C": "Focus / S-Max / Transit Courier",
+    "D": "Focus",
+    "E": "Puma / C-Max (или по-стар Capri)",
+    "F": "Fiesta / Transit",
+    "G": "Scorpio / Transit Connect / Transit Custom / Transit",
+    "H": "Fiesta",
+    "J": "Fiesta / Fusion / B-Max",
+    "K": "Fiesta / EcoSport / Puma",
+    "M": "Kuga",
+    "P": "Transit Connect",
+    "R": "Ka / Transit",
+    "S": "Galaxy / S-Max / Escort",
+    "W": "Galaxy / S-Max / Escort",
+    "U": "Maverick"
+   }
+  },
+  "makes": {
+   "Volkswagen": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "reliable"
+     }
+    ],
+    "models": [
+     {
+      "if": {
+       "pos": "4-6",
+       "is": "ZZZ"
+      },
+      "code": "7-8",
+      "label": "тип",
+      "map": "vw"
+     }
+    ]
+   },
+   "Audi": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "reliable"
+     }
+    ],
+    "models": [
+     {
+      "if": {
+       "pos": "4-6",
+       "is": "ZZZ"
+      },
+      "code": "7-8",
+      "label": "тип",
+      "map": "audi"
+     }
+    ]
+   },
+   "Škoda": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "При Škoda позиция 10 обикновено е моделната година."
+     }
+    ],
+    "models": [
+     {
+      "code": "7-8",
+      "label": "тип",
+      "map": "skoda"
+     }
+    ]
+   },
+   "SEAT": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "При SEAT позиция 10 обикновено е моделната година."
+     }
+    ],
+    "models": [
+     {
+      "if": {
+       "pos": "4-6",
+       "is": "ZZZ"
+      },
+      "code": "7-8",
+      "label": "тип",
+      "map": "seat"
+     }
+    ]
+   },
+   "Cupra": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable"
+     }
+    ],
+    "models": [
+     {
+      "if": {
+       "pos": "4-6",
+       "is": "ZZZ"
+      },
+      "code": "7-8",
+      "label": "тип",
+      "map": "seat"
+     }
+    ]
+   },
+   "Mercedes-Benz": {
+    "years": [
+     {
+      "policy": "none",
+      "note": "В европейските VIN на Mercedes позиция 10 показва волана (ляв/десен), а не годината."
+     }
+    ],
+    "models": [
+     {
+      "code": "4-6",
+      "label": "серия",
+      "map": "mercedes"
+     }
+    ]
+   },
+   "Peugeot": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "При Peugeot/Citroën позиция 10 е годината на производство само при VIN от 2009 г. насам; преди това е кодът на завода."
+     }
+    ],
+    "models": [
+     {
+      "code": "4",
+      "label": "код",
+      "map": "peugeot"
+     }
+    ]
+   },
+   "Citroën": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "При Peugeot/Citroën позиция 10 е годината на производство само при VIN от 2009 г. насам; преди това е кодът на завода."
+     }
+    ]
+   },
+   "DS": {
+    "years": [
+     {
+      "pos": 10,
+      "policy": "probable",
+      "note": "При Peugeot/Citroën позиция 10 е годината на производство само при VIN от 2009 г. насам; преди това е кодът на завода."
+     }
+    ]
+   },
+   "Ford": {
+    "years": [
+     {
+      "if": {
+       "pos": "5-6",
+       "is": "XX"
+      },
+      "pos": 11,
+      "policy": "probable",
+      "note": "При европейските Ford годината е на позиция 11."
+     }
+    ],
+    "models": [
+     {
+      "if": {
+       "pos": "5-6",
+       "is": "XX"
+      },
+      "code": "9",
+      "label": "код",
+      "map": "ford-eu"
+     }
+    ]
+   }
+  }
+ }
+}

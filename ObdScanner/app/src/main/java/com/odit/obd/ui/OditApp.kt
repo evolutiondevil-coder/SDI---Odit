@@ -46,5 +46,6 @@ fun OditApp(
         Screen.FREEZE -> FreezeScreen(vm, snackbar)
         Screen.INFO -> InfoScreen(vm, snackbar, onExportLog)
         Screen.TERMINAL -> TerminalScreen(vm, snackbar, onExportLog)
+        Screen.GARAGE -> GarageScreen(vm, snackbar)
     }
 }

@@ -220,8 +220,7 @@ fun InfoScreen(vm: MainViewModel, snackbar: SnackbarHostState, onExportLog: () -
                     Text("Автомобил", fontWeight = FontWeight.SemiBold)
                     KeyValue("VIN", vm.overview.vin ?: "не е намерен")
                     vinOrigin(vm.overview)?.let { KeyValue("Източник", it) }
-                    vm.overview.vinInfo?.make?.let { KeyValue("Марка", it) }
-                    vm.overview.vinInfo?.year?.let { KeyValue("Моделна година", it.toString()) }
+                    VehicleRows(vm.vehicle, showSources = true)
                     KeyValue("Протокол", vm.protocol?.title ?: "—")
                     TextButton(onClick = { editVin = true }, contentPadding = PaddingValues(0.dp)) {
                         Text(if (vm.overview.vin == null || vm.overview.vinManual) "Въведи VIN ръчно" else "VIN от автомобила е намерен")
@@ -259,6 +258,16 @@ fun InfoScreen(vm: MainViewModel, snackbar: SnackbarHostState, onExportLog: () -
                         style = MaterialTheme.typography.bodySmall,
                     )
                     TextButton(onClick = onExportLog, contentPadding = PaddingValues(0.dp)) { Text("Експорт на лога") }
+                }
+                val packList = vm.dataSources()
+                if (packList.isNotEmpty()) {
+                    InfoCard {
+                        Text("Данни и източници", fontWeight = FontWeight.SemiBold)
+                        for (p in packList) {
+                            Text("${p.title} · версия ${p.version}", style = MaterialTheme.typography.bodySmall)
+                            for (src in p.sources) Text(src, color = Palette.Muted, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(

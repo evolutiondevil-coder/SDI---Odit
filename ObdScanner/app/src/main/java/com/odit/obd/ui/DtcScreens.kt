@@ -118,7 +118,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.dtcSection(
         Text(hint, color = Palette.Muted, style = MaterialTheme.typography.bodySmall)
     }
     items(list, key = { title + it.ecu + it.dtc.code }) { e ->
-        DtcCard(e.dtc, ObdSession.ecuName(e.ecu), onSearch, vm.overview.vinInfo?.make)
+        DtcCard(e.dtc, ObdSession.ecuName(e.ecu), onSearch, vm.vehicle.shortName.ifBlank { null })
     }
 }
 
@@ -197,6 +197,14 @@ fun ModulesScreen(vm: MainViewModel, snackbar: SnackbarHostState, onShare: (Stri
                         )
                         OutlinedButton(onClick = { vm.stopModuleScan() }, modifier = Modifier.fillMaxWidth()) { Text("Спри") }
                     } else {
+                        val known = vm.knownModules
+                        if (known.isNotEmpty()) {
+                            Button(
+                                onClick = { vm.scanModules(full = false, knownOnly = true) },
+                                enabled = isCan && vm.busy == null,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("Модулите от миналия път (${known.size})") }
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
                                 onClick = { vm.scanModules(full = false) },
@@ -223,7 +231,7 @@ fun ModulesScreen(vm: MainViewModel, snackbar: SnackbarHostState, onShare: (Stri
                 }
             }
             items(m.modules, key = { it.responseHeader }) { mod ->
-                ModuleCard(mod, enabled = vm.busy == null && !m.scanning, onClear = { confirm = listOf(mod) }, onSearch = onSearch, make = vm.overview.vinInfo?.make)
+                ModuleCard(mod, enabled = vm.busy == null && !m.scanning, onClear = { confirm = listOf(mod) }, onSearch = onSearch, make = vm.vehicle.shortName.ifBlank { null })
             }
             val withCodes = m.modules.filter { it.dtcs.isNotEmpty() }
             if (withCodes.size > 1 && !m.scanning) {

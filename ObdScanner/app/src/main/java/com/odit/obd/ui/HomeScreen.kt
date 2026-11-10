@@ -52,6 +52,7 @@ fun HomeScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
     var confirmClear by remember { mutableStateOf(false) }
     var confirmExit by remember { mutableStateOf(false) }
     var editVin by remember { mutableStateOf(false) }
+    var editCar by remember { mutableStateOf(false) }
 
     Page(
         title = if (vm.demo) "Автомобил (демо)" else "Автомобил",
@@ -75,7 +76,7 @@ fun HomeScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            VehicleCard(vm, onEditVin = { editVin = true })
+            VehicleCard(vm, onEditVin = { editVin = true }, onEditCar = { editCar = true })
             VinConflictCard(vm.overview.vinReport)
 
             vm.vehicleError?.let { err ->
@@ -116,6 +117,14 @@ fun HomeScreen(vm: MainViewModel, snackbar: SnackbarHostState) {
         }
     }
 
+    if (editCar) {
+        EditVehicleDialog(
+            v = vm.vehicle,
+            user = vm.car?.user ?: com.odit.obd.vehicle.UserVehicle(),
+            onSave = { vm.saveUserVehicle(it) },
+            onDismiss = { editCar = false },
+        )
+    }
     if (editVin) {
         VinDialog(
             initial = if (vm.overview.vinManual) vm.overview.vin.orEmpty() else "",
@@ -153,21 +162,26 @@ fun ClearDialog(title: String = "Изтриване на грешките?", onC
 }
 
 @Composable
-private fun VehicleCard(vm: MainViewModel, onEditVin: () -> Unit) {
+private fun VehicleCard(vm: MainViewModel, onEditVin: () -> Unit, onEditCar: () -> Unit) {
     val o = vm.overview
     InfoCard {
-        val title = o.vinInfo?.let { listOfNotNull(it.make, it.year?.toString()).joinToString(" · ") }
-            ?.ifBlank { null } ?: if (vm.vehicleReady) "Автомобил" else "Адаптерът е свързан"
+        val title = vehicleTitle(vm.vehicle) ?: if (vm.vehicleReady) "Автомобил" else "Адаптерът е свързан"
         Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        VehicleRows(vm.vehicle)
         if (o.vin != null) {
             KeyValue("VIN", o.vin)
             vinOrigin(o)?.let { KeyValue("", it) }
         } else if (vm.vehicleReady && vm.busy == null) {
             KeyValue("VIN", "не е намерен")
         }
-        if (vm.vehicleReady && vm.busy == null && (o.vin == null || o.vinManual)) {
-            TextButton(onClick = onEditVin, contentPadding = PaddingValues(0.dp)) {
-                Text(if (o.vin == null) "Въведи VIN ръчно" else "Промени ръчно въведения VIN")
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            if (vm.vehicleReady && vm.busy == null && (o.vin == null || o.vinManual)) {
+                TextButton(onClick = onEditVin, contentPadding = PaddingValues(0.dp)) {
+                    Text(if (o.vin == null) "Въведи VIN ръчно" else "Промени VIN")
+                }
+            }
+            if (vm.car != null) {
+                TextButton(onClick = onEditCar, contentPadding = PaddingValues(0.dp)) { Text("Поправи данните") }
             }
         }
         vm.protocol?.let { KeyValue("Протокол", it.title) }

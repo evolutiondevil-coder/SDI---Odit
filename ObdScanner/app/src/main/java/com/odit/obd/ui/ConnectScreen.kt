@@ -154,6 +154,13 @@ fun ConnectScreen(vm: MainViewModel, snackbar: SnackbarHostState, withBluetooth:
                 }
             }
 
+            if (vm.garageCars.isNotEmpty()) {
+                item {
+                    OutlinedButton(onClick = { vm.open(Screen.GARAGE) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Гараж (${vm.garageCars.size})")
+                    }
+                }
+            }
             item {
                 TextButton(onClick = { pickDemo = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Демо режим (без автомобил)")
