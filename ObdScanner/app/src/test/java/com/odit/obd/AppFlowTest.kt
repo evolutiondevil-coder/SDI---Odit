@@ -36,6 +36,8 @@ class AppFlowTest {
     private fun pump(ms: Long = 100) {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ms))
         compose.waitForIdle()
+        // Background work (simulated network) runs on real threads with real time.
+        Thread.sleep(5)
     }
 
     private fun waitForText(text: String, timeoutMs: Long = 120_000) {
@@ -79,6 +81,9 @@ class AppFlowTest {
 
     @Test
     fun demoFlow() {
+        waitForText("Онлайн помощ")
+        compose.onNodeWithText("Включи").performClick()
+        pump()
         waitForText("Търси адаптери")
         shot("01_connect")
 
@@ -88,6 +93,7 @@ class AppFlowTest {
         pump()
         waitForText("Volkswagen")
         waitWhileBusy("Четене на данни")
+        waitWhileBusy("Търсене на допълнителни данни онлайн")
         shot("02_home")
 
         compose.onNodeWithText("Грешки на двигателя").performClick()

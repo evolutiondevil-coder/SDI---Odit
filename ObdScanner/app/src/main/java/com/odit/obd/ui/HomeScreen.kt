@@ -168,6 +168,7 @@ private fun VehicleCard(vm: MainViewModel, onEditVin: () -> Unit, onEditCar: () 
         val title = vehicleTitle(vm.vehicle) ?: if (vm.vehicleReady) "Автомобил" else "Адаптерът е свързан"
         Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         VehicleRows(vm.vehicle)
+        OnlineBusyNote(vm)
         if (o.vin != null) {
             KeyValue("VIN", o.vin)
             vinOrigin(o)?.let { KeyValue("", it) }

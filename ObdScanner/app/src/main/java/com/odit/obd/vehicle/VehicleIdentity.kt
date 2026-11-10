@@ -1,5 +1,6 @@
 package com.odit.obd.vehicle
 
+import com.odit.obd.garage.OnlineInfo
 import com.odit.obd.obd.Brand
 import java.util.Calendar
 
@@ -45,8 +46,14 @@ data class UserVehicle(
 /** Decodes a VIN offline with the WMI table and the per-make rules. Never guesses beyond the rules. */
 class VehicleDecoder(private val wmi: WmiDb, private val rules: VinRules) {
 
-    fun decode(vin: String?, user: UserVehicle? = null, currentYear: Int = Calendar.getInstance().get(Calendar.YEAR)): VehicleIdentity {
+    fun decode(
+        vin: String?,
+        user: UserVehicle? = null,
+        online: OnlineInfo? = null,
+        currentYear: Int = Calendar.getInstance().get(Calendar.YEAR),
+    ): VehicleIdentity {
         var id = if (vin == null) VehicleIdentity.UNKNOWN else decodeVin(vin.uppercase(), currentYear)
+        if (online != null && vin != null) id = fillFromOnline(id, online, rules.yearRule(vin.uppercase(), id.make?.value).policy)
         if (user != null) {
             id = applyUser(id, user)
             if (user.make != null) id = id.copy(group = wmi.groupForMake(user.make))
@@ -106,6 +113,20 @@ class VehicleDecoder(private val wmi: WmiDb, private val rules: VinRules) {
         var year = base
         while (year + 30 <= currentYear + 1) year += 30
         return year
+    }
+
+    /** Online data only fills what the VIN rules could not tell; it is never shown as certain. */
+    private fun fillFromOnline(id: VehicleIdentity, o: OnlineInfo, yearPolicy: YearPolicy): VehicleIdentity {
+        val src = if (o.provider == "nhtsa-vpic") "NHTSA vPIC" else o.provider
+        val make = id.make ?: o.make?.let { Field(it, Confidence.ONLINE, src) }
+        return id.copy(
+            make = make,
+            model = id.model ?: o.model?.let { Field(it, Confidence.ONLINE, src) },
+            // vPIC reads position 10 by the North American rule; useless where the make does not encode a year there.
+            year = id.year ?: o.year?.takeIf { yearPolicy != YearPolicy.NONE }?.let { Field(it, Confidence.ONLINE, src) },
+            engine = id.engine ?: o.engine?.let { Field(it, Confidence.ONLINE, src) },
+            group = if (id.group == Brand.OTHER && make != null) wmi.groupForMake(make.value) else id.group,
+        )
     }
 
     companion object {

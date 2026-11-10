@@ -269,10 +269,12 @@ fun InfoScreen(vm: MainViewModel, snackbar: SnackbarHostState, onExportLog: () -
                         }
                     }
                 }
+                OnlineSettingCard(vm)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Odit OBD чете стандартни OBD-II данни директно от автомобила — не използва база с модели, " +
-                        "интернет или реклами.",
+                    "Odit OBD чете стандартни OBD-II данни директно от автомобила и работи изцяло без интернет. " +
+                        "Интернет се използва само ако е включена „Онлайн помощ“ — за допълване на данните за колата " +
+                        "и за обновяване на таблиците. Няма реклами, аналитика и проследяване.",
                     color = Palette.Muted,
                     style = MaterialTheme.typography.bodySmall,
                 )

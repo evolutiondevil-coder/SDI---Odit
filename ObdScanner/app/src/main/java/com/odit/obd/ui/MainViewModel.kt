@@ -49,6 +49,14 @@ import com.odit.obd.vehicle.VehicleIdentity
 import com.odit.obd.vehicle.VinRules
 import com.odit.obd.vehicle.WmiDb
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import com.odit.obd.net.HttpClient
+import com.odit.obd.net.Network
+import com.odit.obd.online.DemoOnlineDecoder
+import com.odit.obd.online.OnlineVehicleDecoder
+import com.odit.obd.online.VpicDecoder
 import kotlinx.coroutines.withContext
 import java.io.File
 import com.odit.obd.uds.ModuleScanner
@@ -205,6 +213,74 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             refreshGarage()
             recomputeVehicle()
+        }
+    }
+
+    // ------------------------------------------------------------ online help
+    private val http = HttpClient()
+
+    /** Network work runs here, never in the adapter queue ([op]), so it cannot slow a scan down. */
+    private val onlineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** User consent for "Онлайн помощ" (off until the user agrees). */
+    var onlineEnabled by mutableStateOf(prefs.getBoolean("online", false))
+        private set
+
+    /** The first-run explanation has been answered. */
+    var onlineAsked by mutableStateOf(prefs.getBoolean("onlineAsked", false))
+        private set
+
+    /** An online lookup is running (shown as a small note, never blocks anything). */
+    var onlineBusy by mutableStateOf(false)
+        private set
+
+    /** Demo only: simulate having internet. */
+    var demoOnline by mutableStateOf(true)
+
+    private val triedOnline = mutableSetOf<String>()
+
+    fun setOnline(enabled: Boolean) {
+        onlineEnabled = enabled
+        onlineAsked = true
+        prefs.edit().putBoolean("online", enabled).putBoolean("onlineAsked", true).apply()
+        if (enabled) car?.let { maybeDecodeOnline(it) }
+    }
+
+    private val vehicleProvider: OnlineVehicleDecoder
+        get() = if (demo) DemoOnlineDecoder(demoOnline) else VpicDecoder(http)
+
+    /** What "Онлайн помощ" sends, for the explanation texts. */
+    val onlineSends: String get() = VpicDecoder(http).sends
+
+    /**
+     * Adds what the online decoder knows about the car, in the background, once per car (cached in the
+     * garage so it is there offline next time). Silent when offline or when the service has nothing.
+     */
+    private fun maybeDecodeOnline(c: CarRecord) {
+        val vin = c.vin ?: return
+        if (c.online != null) return
+        val allowed = if (demo) true else onlineEnabled
+        if (!allowed || !triedOnline.add(c.id)) return
+        val provider = vehicleProvider
+        val app = getApplication<Application>()
+        onlineScope.launch {
+            if (!demo && !Network.isOnline(app)) {
+                triedOnline.remove(c.id) // try again later, when there is a connection
+                return@launch
+            }
+            withContext(Dispatchers.Main) { onlineBusy = true }
+            val info = try {
+                provider.decode(vin)
+            } catch (_: Exception) {
+                null
+            }
+            withContext(Dispatchers.Main) {
+                onlineBusy = false
+                if (info != null && car?.id == c.id) {
+                    updateCar { it.copy(online = info) }
+                    recomputeVehicle()
+                }
+            }
         }
     }
 
@@ -458,10 +534,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         car = record
         recomputeVehicle()
         refreshGarage()
+        maybeDecodeOnline(record)
     }
 
     private fun recomputeVehicle() {
-        vehicle = if (overview.vin == null && car == null) VehicleIdentity.UNKNOWN else decoder.decode(overview.vin, car?.user)
+        vehicle = if (overview.vin == null && car == null) VehicleIdentity.UNKNOWN else decoder.decode(overview.vin, car?.user, car?.online)
     }
 
     private fun updateCar(change: (CarRecord) -> CarRecord) {
@@ -491,7 +568,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Identity of a garage car without connecting (for the garage screen). */
-    fun identityOf(c: CarRecord): VehicleIdentity = decoder.decode(c.vin, c.user)
+    fun identityOf(c: CarRecord): VehicleIdentity = decoder.decode(c.vin, c.user, c.online)
 
     /** Returns an error text, or null when the VIN was accepted. */
     fun setManualVin(input: String): String? {
@@ -550,6 +627,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         overview = Overview()
         vehicle = VehicleIdentity.UNKNOWN
         car = null
+        onlineBusy = false
+        triedOnline.clear()
         dtc = DtcUi()
         modules = ModulesUi()
         live = LiveUi()
@@ -824,6 +903,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
+        onlineScope.cancel()
         stopScan()
         disconnectInternal()
         super.onCleared()

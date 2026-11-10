@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -48,6 +49,10 @@ fun ConnectScreen(vm: MainViewModel, snackbar: SnackbarHostState, withBluetooth:
             title = { Text("Демо автомобил") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = vm.demoOnline, onCheckedChange = { vm.demoOnline = it })
+                        Text("Симулирай интернет (онлайн помощ)", style = MaterialTheme.typography.bodyMedium)
+                    }
                     for (sc in DemoScenario.entries) {
                         Column(
                             Modifier

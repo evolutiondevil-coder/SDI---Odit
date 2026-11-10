@@ -36,6 +36,8 @@ fun OditApp(
         vm.back()
     }
 
+    if (!vm.onlineAsked && vm.screen == Screen.CONNECT) OnlineIntroDialog(vm)
+
     when (vm.screen) {
         Screen.CONNECT -> ConnectScreen(vm, snackbar, withBluetooth)
         Screen.HOME -> HomeScreen(vm, snackbar)
