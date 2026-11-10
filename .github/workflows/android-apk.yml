@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "ObdScanner/**"
+      - "odit-data/**"
       - ".github/workflows/android-apk.yml"
   workflow_dispatch:
 
