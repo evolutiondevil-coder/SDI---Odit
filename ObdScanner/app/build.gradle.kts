@@ -12,8 +12,8 @@ android {
         applicationId = "com.odit.obd"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
     }
 
     // A fixed key kept in the repo so every build (local or CI) can be

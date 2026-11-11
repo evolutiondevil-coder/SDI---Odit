@@ -94,6 +94,8 @@ class SimulatedElm(
         /** Speaks VW's KW1281: answers the wake-up with key bytes 01 8A, then nothing an ELM327 understands. */
         val kw1281: Boolean = false,
         val vag: Boolean = false,
+        /** K-line speed of the unit; it only wakes when the adapter uses the same one (AT IB). */
+        val baud: Int = 10400,
     )
 
     private val kUnits: Map<Int, KUnit> = when (scenario) {
@@ -102,6 +104,7 @@ class SimulatedElm(
             0x01 to KUnit("06A906032HN MARELLI 4LV", mutableListOf(Triple(0x41, 0x2C, 0x23), Triple(0x46, 0x3A, 0x23), Triple(0x46, 0x5A, 0x23)), null, slowOnly = true, vag = true),
             0x17 to KUnit("1J0920826 KOMBI", mutableListOf(), null, slowOnly = true, kw1281 = true),
             0x25 to KUnit("6X0953257 IMMO", mutableListOf(), null, slowOnly = true, kw1281 = true),
+            0x56 to KUnit("1J0035180B RADIO", mutableListOf(), null, slowOnly = true, kw1281 = true, baud = 9600),
         )
         else -> mapOf(
             0x7A to KUnit("SIEMENS SIRIUS32 7700112233", mutableListOf(Triple(0x01, 0x20, 0xA1), Triple(0x03, 0x35, 0x21)), vin),
@@ -120,6 +123,9 @@ class SimulatedElm(
 
     /** Wake-up address set by AT IIA (slow init). */
     private var initAddress = 0x33
+
+    /** K-line speed set by AT IB 10 / AT IB 96. */
+    private var isoBaud = 10400
 
     /** Address of the unit woken up by the last init, if any. */
     private var kOpen: Int? = null
@@ -241,6 +247,8 @@ class SimulatedElm(
         c == "KW1" -> { keyWordCheck = true; listOf("OK") }
         c == "KW" -> lastKeyWords?.let { listOf("1:%02X 2:%02X".format(it.first, it.second)) } ?: listOf("NO DATA")
         c.startsWith("IIA") -> { initAddress = c.substring(3).toInt(16); listOf("OK") }
+        c == "IB10" -> { isoBaud = 10400; listOf("OK") }
+        c == "IB96" -> { isoBaud = 9600; listOf("OK") }
         c == "FI" -> {
             // A fast init (25 ms pattern + StartCommunication) takes a few hundred ms.
             pendingDelayMs = 350
@@ -257,7 +265,7 @@ class SimulatedElm(
         c == "SI" -> {
             // Sending the address byte at 5 baud alone takes 2 s.
             pendingDelayMs = 2_600
-            val unit = if (isOldCar && selected in "34") kUnits[initAddress] else null
+            val unit = if (isOldCar && selected in "34") kUnits[initAddress]?.takeIf { it.baud == isoBaud } else null
             when {
                 unit == null -> { lastKeyWords = null; listOf("BUS INIT: ...ERROR") }
                 unit.kw1281 -> {
@@ -287,7 +295,7 @@ class SimulatedElm(
     private fun reset() {
         echo = true; spaces = true; headers = false; header = 0x7DF; session = 1
         selected = '0'; detected = false; kOpen = null
-        keyWordCheck = true; lastKeyWords = null; initAddress = 0x33
+        keyWordCheck = true; lastKeyWords = null; initAddress = 0x33; isoBaud = 10400
     }
 
     // -------------------------------------------------------------------- car

@@ -147,7 +147,7 @@ class KLineDirect(private val s: ObdSession) {
         cmd("ATWM81${a}F13E")
         cmd("ATSTFF")
         cmd("ATAT0")
-        if (t.init == KInit.SLOW) return slowInit(a).also { if (it != Woke.NO) cmd("ATAT1") }
+        if (t.init == KInit.SLOW) return slowInit(a, t.codes == KCodes.VAG).also { if (it != Woke.NO) cmd("ATAT1") }
         cmd("ATSP5")
         delay(400) // bus idle time before a new init
         when (init("ATFI", 6_000)) {
@@ -159,7 +159,7 @@ class KLineDirect(private val s: ObdSession) {
             }
             false -> {
                 // Older units only answer the 5-baud wake-up.
-                val w = slowInit(a)
+                val w = slowInit(a, false)
                 if (w != Woke.NO) cmd("ATAT1")
                 return w
             }
@@ -169,12 +169,22 @@ class KLineDirect(private val s: ObdSession) {
     }
 
     /** 5-baud wake-up at [a]. Key words are not checked, but read back to recognise KW1281 units. */
-    private suspend fun slowInit(a: String): Woke {
+    private suspend fun slowInit(a: String, tryBothSpeeds: Boolean): Woke {
         cmd("ATSP4")
         cmd("ATIIA$a")
         cmd("ATKW0")
+        cmd("ATIB10")
         delay(600)
-        if (init("ATSI", 12_000) != true) return Woke.NO
+        if (init("ATSI", 12_000) != true) {
+            // Some older VW units answer at 9600 baud instead of the standard 10400.
+            if (!tryBothSpeeds) return Woke.NO
+            cmd("ATIB96")
+            delay(600)
+            if (init("ATSI", 12_000) != true) {
+                cmd("ATIB10")
+                return Woke.NO
+            }
+        }
         val kw = keyWords(cmd("ATKW"))
         return if (kw == listOf(0x01, 0x8A)) Woke.KW1281 else Woke.KWP
     }

@@ -196,6 +196,8 @@ class ObdSession(
             // Header, wake-up message and protocol were changed: start from the adapter's defaults.
             kLineDirty = false
             runCatching { elm.send("ATD", 3_000) }
+            runCatching { elm.send("ATIB10", 2_000) } // back to the standard K-line speed
+            runCatching { elm.send("ATKW1", 2_000) }
             applySettings()
             if (vehicleConnected) runCatching { elm.send("ATSP${protocol.code}", 2_000) }
             runCatching { elm.send(if (protocol.isCan) "ATST32" else "ATSTFF", 2_000) }

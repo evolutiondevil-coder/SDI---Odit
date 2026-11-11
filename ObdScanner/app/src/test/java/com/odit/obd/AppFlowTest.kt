@@ -321,7 +321,8 @@ class AppFlowTest {
         shot("22_old_vw_identified")
 
         click("Директна връзка (стари коли, K-line)")
-        waitForText("Намерени модули: 3", timeoutMs = 600_000)
+        // Engine (KWP2000), cluster and immobiliser (KW1281), radio (KW1281 at 9600 baud).
+        waitForText("Намерени модули: 4", timeoutMs = 600_000)
         waitForText("VAG 16684 / P0300")
         shot("23_old_vw_modules")
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("стария протокол на VW (KW1281)", substring = true))
