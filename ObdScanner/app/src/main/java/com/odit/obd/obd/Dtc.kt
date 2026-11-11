@@ -23,19 +23,33 @@ data class Dtc(
      * must not be read as a standard P/C/B/U code.
      */
     val raw: Boolean = false,
+    /** VW group 5-digit fault number (old K-line modules), e.g. 16684. */
+    val vagNumber: Int? = null,
 ) {
     val displayCode: String
         get() = when {
+            vagNumber != null && !raw -> "VAG %05d / %s".format(vagNumber, code)
+            vagNumber != null -> "VAG %05d".format(vagNumber)
             raw -> "DTC $code"
             ftb != null && ftb != 0 -> "%s-%02X".format(code, ftb)
             else -> code
         }
 
+    /** What to type in a web search for this code. */
+    val searchTerm: String
+        get() = when {
+            vagNumber != null && !raw -> "%05d %s".format(vagNumber, code)
+            vagNumber != null -> "VAG %05d".format(vagNumber)
+            raw -> "DTC $code"
+            else -> code
+        }
+
     val description: String
-        get() = if (raw) {
-            "Код на производителя от стар модул (K-line). Значението зависи от марката и модула — потърсете го с бутона по-долу."
-        } else {
-            DtcDatabase.describe(code)
+        get() = when {
+            vagNumber != null && raw ->
+                "Код на VW групата от стар модул. Значението зависи от модула — потърсете го с бутона по-долу."
+            raw -> "Код на производителя от стар модул (K-line). Значението зависи от марката и модула — потърсете го с бутона по-долу."
+            else -> DtcDatabase.describe(code)
         }
 
     /** Set when the description comes from a manufacturer pack (shown under the text). */
@@ -52,6 +66,20 @@ data class Dtc(
             val d1 = (a shr 4) and 0x03
             val d2 = a and 0x0F
             return "%c%d%X%02X".format(letter, d1, d2, b)
+        }
+
+        /**
+         * VW group 5-digit fault numbers of engine units map onto SAE codes:
+         * 16384 + n = P0nnn (16684 = P0300) and 17408 + n = P1nnn (17978 = P1570).
+         * Other numbers have no SAE equivalent and are shown as they are.
+         */
+        fun fromVag(value: Int, status: Int? = null): Dtc {
+            val sae = when (value) {
+                in 16384..17383 -> "P0%03d".format(value - 16384)
+                in 17408..18407 -> "P1%03d".format(value - 17408)
+                else -> null
+            }
+            return Dtc(sae ?: "%05d".format(value), DtcKind.STORED, status = status, raw = sae == null, vagNumber = value)
         }
 
         /** Inverse of [decode]; used by the simulator and tests. */

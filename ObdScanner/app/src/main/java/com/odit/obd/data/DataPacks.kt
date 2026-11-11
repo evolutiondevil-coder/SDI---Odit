@@ -2,6 +2,8 @@ package com.odit.obd.data
 
 import com.odit.obd.obd.Brand
 import com.odit.obd.obd.DtcDatabase
+import com.odit.obd.uds.KCodes
+import com.odit.obd.uds.KInit
 import com.odit.obd.uds.KLineTarget
 import com.odit.obd.uds.ModuleAddress
 import com.odit.obd.uds.ModuleCatalog
@@ -68,7 +70,12 @@ class DataPacks(
                 val a = g.getJSONArray(k)
                 out[k] = (0 until a.length()).map { i ->
                     val m = a.getJSONObject(i)
-                    KLineTarget(m.getString("addr").toInt(16), m.optString("name").ifEmpty { null })
+                    KLineTarget(
+                        m.getString("addr").toInt(16),
+                        m.optString("name").ifEmpty { null },
+                        if (m.optString("init") == "slow") KInit.SLOW else KInit.FAST_THEN_SLOW,
+                        if (m.optString("codes") == "vag") KCodes.VAG else KCodes.RAW,
+                    )
                 }
             }
             return out

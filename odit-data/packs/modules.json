@@ -1,6 +1,6 @@
 {
  "id": "modules",
- "version": 2,
+ "version": 3,
  "schema": 1,
  "title": "Имена на модули по марки (CAN адреси)",
  "sources": [
@@ -14,6 +14,12 @@
    "url": "https://github.com/cedricp/ddt4all",
    "license": "факти; без копиран код или данни",
    "retrieved": "2026-11-10"
+  },
+  {
+   "name": "VW група: адресите 01, 03, 17, 19, 25, 35, 56 и имената им са както ги показва DollarFix+ при сканиране на кола от групата; 02, 08, 15, 46 са по общоизвестната номерация на VW (непроверени). Ключовите байтове 01 8A на KW1281 са сверени с отворения проект kwp1281_tool",
+   "url": "https://github.com/mnaberez/vwradio/tree/main/kwp1281_tool",
+   "license": "факти; без копиран код",
+   "retrieved": "2026-11-11"
   }
  ],
  "verified": false,
@@ -295,6 +301,79 @@
     },
     {
      "addr": "7A"
+    },
+    {
+     "addr": "01",
+     "init": "slow",
+     "codes": "vag"
+    }
+   ],
+   "VAG": [
+    {
+     "addr": "01",
+     "name": "01 Двигател",
+     "init": "slow",
+     "codes": "vag"
+    },
+    {
+     "addr": "03",
+     "name": "03 Спирачки (ABS)",
+     "init": "slow",
+     "codes": "vag"
+    },
+    {
+     "addr": "15",
+     "name": "15 Въздушни възглавници",
+     "init": "slow",
+     "codes": "vag"
+    },
+    {
+     "addr": "17",
+     "name": "17 Арматурно табло",
+     "init": "slow",
+     "codes": "vag"
+    },
+    {
+     "addr": "02",
+     "name": "02 Скоростна кутия",
+     "init": "slow",
+     "codes": "vag"
+    },
+    {
+     "addr": "08",
+     "name": "08 Климатик",
+     "init": "slow",
+     "codes": "vag"
+    },
+    {
+     "addr": "19",
+     "name": "19 Гейтуей (CAN)",
+     "init": "slow",
+     "codes": "vag"
+    },
+    {
+     "addr": "25",
+     "name": "25 Имобилайзер",
+     "init": "slow",
+     "codes": "vag"
+    },
+    {
+     "addr": "35",
+     "name": "35 Централно заключване",
+     "init": "slow",
+     "codes": "vag"
+    },
+    {
+     "addr": "46",
+     "name": "46 Комфорт",
+     "init": "slow",
+     "codes": "vag"
+    },
+    {
+     "addr": "56",
+     "name": "56 Радио",
+     "init": "slow",
+     "codes": "vag"
     }
    ]
   }

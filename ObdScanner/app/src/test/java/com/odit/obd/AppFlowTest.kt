@@ -296,4 +296,37 @@ class AppFlowTest {
         waitForText("Намерени модули: 3 · с грешки: 0")
         shot("21_old_car_cleared")
     }
+
+    @Test
+    fun oldVwShowsWhichModulesCannotBeRead() {
+        answerIntro(false)
+        click("Демо режим (без автомобил)")
+        waitForText("Стар VW (K-line)")
+        compose.onNodeWithText("Симулирай интернет (онлайн помощ)").performClick()
+        pump()
+        compose.onNodeWithText("Стар VW (K-line)").performClick()
+        pump()
+        waitForText("Няма връзка с автомобила", timeoutMs = 300_000)
+
+        // The adapter check is offered right in the failure card.
+        click("Провери адаптера (около 20 с)")
+        waitWhileBusy("Проверка на адаптера", timeoutMs = 300_000)
+        waitForText("K-line изглежда реално поддържан")
+
+        compose.onNode(hasSetTextAction()).performTextInput("WVWZZZ1JZ2W123456")
+        pump()
+        compose.onNodeWithText("Търси").performClick()
+        pump()
+        waitForText("Golf IV / Bora (вероятно)")
+        shot("22_old_vw_identified")
+
+        click("Директна връзка (стари коли, K-line)")
+        waitForText("Намерени модули: 3", timeoutMs = 600_000)
+        waitForText("VAG 16684 / P0300")
+        shot("23_old_vw_modules")
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("стария протокол на VW (KW1281)", substring = true))
+        pump()
+        waitForText("стария протокол на VW (KW1281)")
+        shot("24_old_vw_kw1281")
+    }
 }

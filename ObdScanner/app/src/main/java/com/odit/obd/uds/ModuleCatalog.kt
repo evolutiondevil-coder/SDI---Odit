@@ -63,10 +63,22 @@ object ModuleCatalog {
     /** K-line addresses per make group from the "modules" pack. */
     @Volatile var packKLine: Map<String, List<KLineTarget>> = emptyMap()
 
+    private fun vagK(addr: Int, name: String) = KLineTarget(addr, name, KInit.SLOW, KCodes.VAG)
+
     private val builtInKLine: Map<String, List<KLineTarget>> = mapOf(
         // 0x7A is the address Renault's own tools use for the engine (injection) unit.
         "RENAULT_NISSAN" to listOf(KLineTarget(0x7A, "Двигател (впръскване)")),
-        "ANY" to listOf(KLineTarget(0x10, null), KLineTarget(0x11, null), KLineTarget(0x7A, null)),
+        // VW group address words (the numbers VW's own tools show: 01 engine, 03 brakes, 17 cluster...).
+        "VAG" to listOf(
+            vagK(0x01, "01 Двигател"), vagK(0x03, "03 Спирачки (ABS)"), vagK(0x15, "15 Въздушни възглавници"),
+            vagK(0x17, "17 Арматурно табло"), vagK(0x02, "02 Скоростна кутия"), vagK(0x08, "08 Климатик"),
+            vagK(0x19, "19 Гейтуей (CAN)"), vagK(0x25, "25 Имобилайзер"), vagK(0x35, "35 Централно заключване"),
+            vagK(0x46, "46 Комфорт"), vagK(0x56, "56 Радио"),
+        ),
+        "ANY" to listOf(
+            KLineTarget(0x10, null), KLineTarget(0x11, null), KLineTarget(0x7A, null),
+            KLineTarget(0x01, null, KInit.SLOW, KCodes.VAG),
+        ),
     )
 
     /** Control units to try on the K-line for this make (the generic list when the make is unknown). */

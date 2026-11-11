@@ -269,6 +269,7 @@ fun InfoScreen(vm: MainViewModel, snackbar: SnackbarHostState, onExportLog: () -
                         }
                     }
                 }
+                if (vm.adapterReady) AdapterCheckCard(vm)
                 OnlineSettingCard(vm)
                 Spacer(Modifier.height(8.dp))
                 Text(

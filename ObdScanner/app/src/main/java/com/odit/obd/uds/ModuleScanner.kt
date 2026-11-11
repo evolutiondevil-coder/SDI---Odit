@@ -38,6 +38,8 @@ data class FoundModule(
     val readError: String?,
     /** VIN stored in this module (UDS 22 F190 / KWP 1A 90), if it reports one. */
     val vin: String? = null,
+    /** How this K-line unit was reached (to reach it the same way when clearing). */
+    val kLine: KLineTarget? = null,
 ) {
     val addressLabel: String
         get() = when {

@@ -137,3 +137,44 @@ fun VinInlineEntry(vm: MainViewModel, hint: String) {
         }
     }
 }
+
+/** "Проверка на адаптера": button and plain-words result. */
+@Composable
+fun AdapterCheckCard(vm: MainViewModel) {
+    InfoCard {
+        Text("Проверка на адаптера", fontWeight = FontWeight.SemiBold)
+        Text(
+            "Проверява кои команди знае адаптерът и дали в режим ELM327 има истински K-line (нужен за старите коли). " +
+                "Най-точна е при включено запалване. Не записва нищо в колата.",
+            color = Palette.Muted,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        val r = vm.adapterReport
+        if (r != null) {
+            for (line in r.verdict) Text(line, style = MaterialTheme.typography.bodyMedium)
+            var details by remember { mutableStateOf(false) }
+            TextButton(onClick = { details = !details }, contentPadding = PaddingValues(0.dp)) {
+                Text(if (details) "Скрий подробностите" else "Подробности")
+            }
+            if (details) {
+                for (i in r.items) {
+                    val mark = when (i.known) {
+                        true -> "✓"
+                        false -> "✗ не се поддържа"
+                        null -> "—"
+                    }
+                    Text(
+                        "${i.title} (${i.command}): ${i.answer.take(60)} · ${i.ms} мс $mark",
+                        color = Palette.Muted,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+        Button(
+            onClick = { vm.runAdapterCheck() },
+            enabled = vm.busy == null && vm.adapterReady,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(if (r == null) "Провери адаптера" else "Провери отново") }
+    }
+}

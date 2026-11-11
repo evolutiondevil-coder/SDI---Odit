@@ -10,4 +10,5 @@ enum class DemoScenario(val title: String, val description: String) {
     KLINE("Стара кола (K-line)", "ISO 14230 KWP без 09 02; VIN с KWP 1A 90."),
     ACTIVE_FAULT("Активна повреда", "Една грешка се връща веднага след изтриване, защото проблемът е налице."),
     OLD_RENAULT("Стара кола без OBD2", "Renault от 2000 г.: не отговаря на OBD2, а само директно по K-line."),
+    OLD_VW("Стар VW (K-line)", "VW от около 2000 г. без OBD2: двигателят говори KWP2000, таблото и имобилайзерът — стария KW1281."),
 }

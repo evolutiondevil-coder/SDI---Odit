@@ -39,6 +39,8 @@ import com.odit.obd.uds.DiagType
 import com.odit.obd.uds.FoundModule
 import com.odit.obd.uds.KLineDirect
 import com.odit.obd.uds.ModuleCatalog
+import com.odit.obd.obd.AdapterCheck
+import com.odit.obd.obd.AdapterReport
 import com.odit.obd.obd.ProtocolAttempt
 import com.odit.obd.uds.ModuleAddress
 import com.odit.obd.data.AppPackSource
@@ -188,6 +190,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** What the adapter answered for every protocol tried. */
     var connectAttempts by mutableStateOf<List<ProtocolAttempt>>(emptyList())
+        private set
+
+    /** Result of the last "Проверка на адаптера". */
+    var adapterReport by mutableStateOf<AdapterReport?>(null)
         private set
 
     /** VINs typed earlier for cars used with this adapter (offered as one-tap choices). */
@@ -720,6 +726,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         return null
     }
 
+    /** Checks which commands the adapter knows and whether its K-line is real (see [AdapterCheck]). */
+    fun runAdapterCheck() {
+        op("Проверка на адаптера…") { s ->
+            stopLive()
+            adapterReport = AdapterCheck(s) { android.os.SystemClock.elapsedRealtime() }.run { step -> busy = step }
+        }
+    }
+
     /** Text of the raw communication log for sharing. */
     fun exportLog(): String = log.export(
         linkedMapOf(
@@ -731,6 +745,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             "vehicle" to vehicle.shortName.ifBlank { "—" },
             "vin-sources" to overview.vinReport.found.joinToString { "${it.ecu}/${it.method.name}=${it.vin}" }.ifEmpty { "—" },
             "android" to "${android.os.Build.VERSION.RELEASE} (${android.os.Build.MODEL})",
+            "adapter-check" to (adapterReport?.summary ?: "—"),
+            "connect-attempts" to connectAttempts.joinToString("; ") { "${it.protocol.code}=${it.answer} (${it.ms} ms)" }.ifEmpty { "—" },
         ),
     )
 
@@ -760,6 +776,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         vehicleError = null
         connectDiagnosis = null
         connectAttempts = emptyList()
+        adapterReport = null
         sessionManualVin = null
         vinSuggestions = emptyList()
         overview = Overview()

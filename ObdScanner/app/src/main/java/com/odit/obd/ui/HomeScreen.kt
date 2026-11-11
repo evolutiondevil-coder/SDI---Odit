@@ -107,6 +107,12 @@ fun HomeScreen(vm: MainViewModel, snackbar: SnackbarHostState, onExportLog: () -
                         color = Palette.Muted,
                         style = MaterialTheme.typography.bodySmall,
                     )
+                    vm.adapterReport?.let { r -> for (line in r.verdict) Text(line, style = MaterialTheme.typography.bodySmall) }
+                    OutlinedButton(
+                        onClick = { vm.runAdapterCheck() },
+                        enabled = vm.busy == null,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(if (vm.adapterReport == null) "Провери адаптера (около 20 с)" else "Провери адаптера отново") }
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         TextButton(onClick = onExportLog, contentPadding = PaddingValues(0.dp)) { Text("Изпрати лога") }
                         TextButton(onClick = { showAttempts = !showAttempts }, contentPadding = PaddingValues(0.dp)) {

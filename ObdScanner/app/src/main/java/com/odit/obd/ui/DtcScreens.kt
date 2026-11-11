@@ -152,7 +152,7 @@ fun DtcCard(dtc: Dtc, source: String?, onSearch: (String) -> Unit, make: String?
         dtc.descriptionSource?.let { Text("Описание $it", color = Palette.Muted, style = MaterialTheme.typography.bodySmall) }
         dtc.ftbDescription?.let { Text("Тип: $it", color = Palette.Muted, style = MaterialTheme.typography.bodySmall) }
         TextButton(
-            onClick = { onSearch(listOfNotNull(dtc.code, make).joinToString(" ")) },
+            onClick = { onSearch(listOfNotNull(dtc.searchTerm, make).joinToString(" ")) },
             contentPadding = PaddingValues(0.dp),
         ) { Text("Търси в интернет") }
     }
@@ -325,7 +325,7 @@ private fun ModuleCard(
             Text(dtc.description, style = MaterialTheme.typography.bodySmall)
             dtc.descriptionSource?.let { Text("Описание $it", color = Palette.Muted, style = MaterialTheme.typography.bodySmall) }
             dtc.ftbDescription?.let { Text("Тип: $it", color = Palette.Muted, style = MaterialTheme.typography.bodySmall) }
-            TextButton(onClick = { onSearch(listOfNotNull(dtc.code, make).joinToString(" ")) }, contentPadding = PaddingValues(0.dp)) {
+            TextButton(onClick = { onSearch(listOfNotNull(dtc.searchTerm, make).joinToString(" ")) }, contentPadding = PaddingValues(0.dp)) {
                 Text("Търси в интернет")
             }
         }

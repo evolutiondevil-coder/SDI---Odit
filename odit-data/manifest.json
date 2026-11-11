@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "updated": "2026-11-10",
+ "updated": "2026-11-11",
  "packs": [
   {
    "id": "dtc-ford",
@@ -74,10 +74,10 @@
   },
   {
    "id": "modules",
-   "version": 2,
+   "version": 3,
    "file": "packs/modules.json",
-   "bytes": 6140,
-   "sha256": "f433d0d0630c4139267b40359db0abcaad121087d21c02f3e6090f53a4f185bb",
+   "bytes": 8108,
+   "sha256": "ec22bffcecebbbfac71ec28fa2885e4fa9983a3f8ae9872ae4a42a00b5c70c78",
    "title": "Имена на модули по марки (CAN адреси)"
   },
   {

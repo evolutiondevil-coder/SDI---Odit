@@ -22,7 +22,7 @@ class SimulatedElm(
     constructor(scenario: DemoScenario) : this(
         when (scenario) {
             DemoScenario.KLINE -> '5'
-            DemoScenario.OLD_RENAULT -> 'X' // no OBD2 protocol at all
+            DemoScenario.OLD_RENAULT, DemoScenario.OLD_VW -> 'X' // no OBD2 protocol at all
             else -> '6'
         },
         20, scenario,
@@ -55,6 +55,7 @@ class SimulatedElm(
         DemoScenario.UNKNOWN_WMI -> "Y3MZZZ15ZKA000777"
         DemoScenario.KLINE -> "VF1BB0A0526123456"
         DemoScenario.OLD_RENAULT -> "VF1JA0B0521234567"
+        DemoScenario.OLD_VW -> "WVWZZZ1JZ2W123456"
         else -> "WVWZZZ1KZ8W123456"
     }
 
@@ -79,18 +80,46 @@ class SimulatedElm(
         DemoScenario.VIN_UDS_ENGINE -> if (tx == 0x7E0) vin else null
         DemoScenario.VIN_OTHER_MODULE -> if (tx == 0x714) vin else null
         DemoScenario.VIN_CONFLICT -> if (tx == 0x713) otherVin else vin
-        DemoScenario.KLINE, DemoScenario.OLD_RENAULT -> null
+        DemoScenario.KLINE, DemoScenario.OLD_RENAULT, DemoScenario.OLD_VW -> null
         DemoScenario.ACTIVE_FAULT -> vin
     }
 
     // ------------------------------------------------- old car: K-line units with physical addressing
-    private class KUnit(val ident: String, val dtcs: MutableList<Triple<Int, Int, Int>>, val vin: String?)
-
-    private val kUnits: Map<Int, KUnit> = mapOf(
-        0x7A to KUnit("SIEMENS SIRIUS32 7700112233", mutableListOf(Triple(0x01, 0x20, 0xA1), Triple(0x03, 0x35, 0x21)), vin),
-        0x2C to KUnit("AUTOLIV AB8.0", mutableListOf(Triple(0x00, 0x15, 0x81)), null),
-        0x26 to KUnit("UCH N2", mutableListOf(), vin),
+    private class KUnit(
+        val ident: String,
+        val dtcs: MutableList<Triple<Int, Int, Int>>,
+        val vin: String?,
+        /** Wakes only with the 5-baud init (VW group). */
+        val slowOnly: Boolean = false,
+        /** Speaks VW's KW1281: answers the wake-up with key bytes 01 8A, then nothing an ELM327 understands. */
+        val kw1281: Boolean = false,
+        val vag: Boolean = false,
     )
+
+    private val kUnits: Map<Int, KUnit> = when (scenario) {
+        DemoScenario.OLD_VW -> mapOf(
+            // 16684 = P0300 (0x412C), 17978 = P1570 (0x463A), 18010 has no SAE equivalent (0x465A).
+            0x01 to KUnit("06A906032HN MARELLI 4LV", mutableListOf(Triple(0x41, 0x2C, 0x23), Triple(0x46, 0x3A, 0x23), Triple(0x46, 0x5A, 0x23)), null, slowOnly = true, vag = true),
+            0x17 to KUnit("1J0920826 KOMBI", mutableListOf(), null, slowOnly = true, kw1281 = true),
+            0x25 to KUnit("6X0953257 IMMO", mutableListOf(), null, slowOnly = true, kw1281 = true),
+        )
+        else -> mapOf(
+            0x7A to KUnit("SIEMENS SIRIUS32 7700112233", mutableListOf(Triple(0x01, 0x20, 0xA1), Triple(0x03, 0x35, 0x21)), vin),
+            0x2C to KUnit("AUTOLIV AB8.0", mutableListOf(Triple(0x00, 0x15, 0x81)), null),
+            0x26 to KUnit("UCH N2", mutableListOf(), vin),
+        )
+    }
+
+    private val isOldCar: Boolean get() = scenario == DemoScenario.OLD_RENAULT || scenario == DemoScenario.OLD_VW
+
+    /** AT KW0 / KW1: key-word checking during the K-line wake-up. */
+    private var keyWordCheck = true
+
+    /** Key bytes of the last wake-up (AT KW). */
+    private var lastKeyWords: Pair<Int, Int>? = null
+
+    /** Wake-up address set by AT IIA (slow init). */
+    private var initAddress = 0x33
 
     /** Address of the unit woken up by the last init, if any. */
     private var kOpen: Int? = null
@@ -109,10 +138,18 @@ class SimulatedElm(
             else -> listOf("NO DATA")
         }
         val unit = kUnits[addr] ?: return listOf("BUS INIT: ...ERROR")
+        // A KW1281 unit never answers KWP2000 requests.
+        if (unit.kw1281) return listOf("NO DATA")
+        if (kOpen != addr && unit.slowOnly) return listOf("BUS INIT: ...ERROR")
         val prefix = if (kOpen != addr) { kOpen = addr; listOf("BUS INIT: OK") } else emptyList()
         val sid = req[0]
         val answer: IntArray = when {
-            sid == 0x10 && req.getOrNull(1) == 0xC0 -> intArrayOf(0x50, 0xC0)
+            sid == 0x10 && req.getOrNull(1) == 0xC0 && !unit.vag -> intArrayOf(0x50, 0xC0)
+            sid == 0x10 && req.getOrNull(1) == 0x89 && unit.vag -> intArrayOf(0x50, 0x89)
+            sid == 0x1A && req.getOrNull(1) == 0x9B && unit.vag -> intArrayOf(0x5A, 0x9B) + unit.ident.map { it.code }.toIntArray()
+            sid == 0x18 && unit.vag -> intArrayOf(0x58, unit.dtcs.size) + unit.dtcs.flatMap { listOf(it.first, it.second, it.third) }.toIntArray()
+            sid == 0x17 && unit.vag -> intArrayOf(0x7F, 0x17, 0x11)
+            sid == 0x21 && unit.vag -> intArrayOf(0x7F, 0x21, 0x11)
             sid == 0x10 -> intArrayOf(0x7F, 0x10, 0x12)
             sid == 0x3E -> intArrayOf(0x7E)
             sid == 0x21 && req.getOrNull(1) == 0x80 -> intArrayOf(0x61, 0x80, 0x00) + unit.ident.map { it.code }.toIntArray()
@@ -199,16 +236,38 @@ class SimulatedElm(
         c == "H1" -> { headers = true; listOf("OK") }
         c == "RV" -> listOf("12.6V")
         c == "DPN" -> listOf(if (selected == '0') "A$carProtocol" else "$selected")
+        c == "@1" -> listOf("OBDII to RS232 Interpreter")
+        c == "KW0" -> { keyWordCheck = false; listOf("OK") }
+        c == "KW1" -> { keyWordCheck = true; listOf("OK") }
+        c == "KW" -> lastKeyWords?.let { listOf("1:%02X 2:%02X".format(it.first, it.second)) } ?: listOf("NO DATA")
+        c.startsWith("IIA") -> { initAddress = c.substring(3).toInt(16); listOf("OK") }
         c == "FI" -> {
+            // A fast init (25 ms pattern + StartCommunication) takes a few hundred ms.
+            pendingDelayMs = 350
             val addr = kAddress()
-            if (scenario == DemoScenario.OLD_RENAULT && selected == '5' && addr != null && addr in kUnits) {
+            val unit = addr?.let { kUnits[it] }
+            if (isOldCar && selected == '5' && unit != null && !unit.slowOnly) {
                 kOpen = addr
+                lastKeyWords = 0xEF to 0x8F
                 listOf("BUS INIT: OK")
             } else {
                 listOf("BUS INIT: ...ERROR")
             }
         }
-        c == "SI" -> listOf("BUS INIT: ...ERROR")
+        c == "SI" -> {
+            // Sending the address byte at 5 baud alone takes 2 s.
+            pendingDelayMs = 2_600
+            val unit = if (isOldCar && selected in "34") kUnits[initAddress] else null
+            when {
+                unit == null -> { lastKeyWords = null; listOf("BUS INIT: ...ERROR") }
+                unit.kw1281 -> {
+                    lastKeyWords = 0x01 to 0x8A
+                    if (keyWordCheck) listOf("BUS INIT: ...ERROR") else listOf("BUS INIT: OK")
+                }
+                else -> { kOpen = initAddress; lastKeyWords = 0xEF to 0x8F; listOf("BUS INIT: OK") }
+            }
+        }
+        c == "STI" -> listOf("?") // not an STN chip
         c.startsWith("SPA") -> { selected = '0'; detected = false; listOf("OK") }
         c.startsWith("SP") || c.startsWith("TP") -> {
             selected = c.last(); detected = false; kOpen = null; listOf("OK")
@@ -221,19 +280,20 @@ class SimulatedElm(
         c.startsWith("CRA") || c.startsWith("CF") || c.startsWith("CM") || c.startsWith("FC") ||
             c.startsWith("ST") || c.startsWith("CP") || c.startsWith("AT") || c.startsWith("L") ||
             c.startsWith("D0") || c.startsWith("D1") || c.startsWith("CAF") || c.startsWith("SW") ||
-            c.startsWith("WM") || c.startsWith("IB") || c.startsWith("IIA") -> listOf("OK")
+            c.startsWith("WM") || c.startsWith("IB") -> listOf("OK")
         else -> listOf("?")
     }
 
     private fun reset() {
         echo = true; spaces = true; headers = false; header = 0x7DF; session = 1
         selected = '0'; detected = false; kOpen = null
+        keyWordCheck = true; lastKeyWords = null; initAddress = 0x33
     }
 
     // -------------------------------------------------------------------- car
 
     private fun obd(req: IntArray): List<String> {
-        if (scenario == DemoScenario.OLD_RENAULT) return oldCar(req)
+        if (isOldCar) return oldCar(req)
         val prefix = mutableListOf<String>()
         if (!detected) {
             if (selected == '0') prefix += "SEARCHING..."
