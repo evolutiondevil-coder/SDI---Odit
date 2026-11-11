@@ -391,6 +391,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val adapterReady: Boolean get() = session != null
     private val brand: Brand get() = vehicle.group
 
+    /** The car is from the VW group (its old modules mostly speak KW1281). */
+    val isVagGroup: Boolean get() = brand == Brand.VAG
+
     // ------------------------------------------------------------- navigation
 
     fun open(target: Screen) {
@@ -475,7 +478,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         stopScan()
         demoScenario = scenario
         demoGarage.all().forEach { demoGarage.delete(it.id) }
-        connectWith("демо: ${scenario.title}", listOf(LinkMode.AUTO), null) { SimulatedElm(scenario) }
+        connectWith("демо: ${scenario.title}", listOf(LinkMode.AUTO), null) {
+            SimulatedElm(scenario, clock = { android.os.SystemClock.elapsedRealtime() })
+        }
     }
 
     private var demoScenario: DemoScenario? = null
@@ -590,6 +595,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             voltage != null && voltage < 6.0 ->
                 "Адаптерът не отчита напрежение от колата ($volts). Проверете дали е влязъл добре в буксата и бушона " +
                     "на диагностичната букса (често е общ със запалката)."
+            // A unit answered the K-line wake-up but not one OBD request (Renault Scénic I in a real log).
+            kLine.any { it.woke } ->
+                "Модул на колата отговори на събуждането по K-line, но не и на стандартните OBD2 заявки. Значи колата " +
+                    "е отпреди OBD2/EOBD или говори само по протокола на производителя (при по-старите Renault — „ISO8“). " +
+                    "Натиснете „Директна връзка (стари коли, K-line)“ по-долу — така се питат модулите поотделно."
             // A real K-line wake-up takes seconds; an instant refusal means the adapter never tried.
             kLine.isNotEmpty() && kLine.all { it.answer == "?" || (it.ms < 900 && it.answer != "OK") } ->
                 "Адаптерът отказа опитите по K-line почти мигновено — изглежда в този режим той не поддържа K-line, " +

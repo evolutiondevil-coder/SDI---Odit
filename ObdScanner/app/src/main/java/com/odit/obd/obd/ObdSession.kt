@@ -12,8 +12,11 @@ import java.io.IOException
 
 class VehicleNotRespondingException(message: String) : IOException(message)
 
-/** What the adapter answered when one protocol was tried, and how long its first answer took. */
-data class ProtocolAttempt(val protocol: ObdProtocol, val answer: String, val ms: Long)
+/**
+ * What the adapter answered when one protocol was tried, and how long its first answer took.
+ * [woke] = a control unit answered the K-line wake-up, even if it then ignored the OBD requests.
+ */
+data class ProtocolAttempt(val protocol: ObdProtocol, val answer: String, val ms: Long, val woke: Boolean = false)
 
 /** The answer to one OBD/UDS request, already split per control unit. */
 class ObdReply(val lines: List<String>, val messages: List<EcuMessage>, val error: String?) {
@@ -56,6 +59,27 @@ class ObdSession(
     /** Set when K-line physical addressing changed the header, wake-up message and protocol. */
     internal var kLineDirty = false
 
+    /**
+     * Speed of all deliberate waits (1.0 on a car). Tests run the simulated car faster and set the
+     * same factor here, so that "wait 5 s for the unit to close its session" stays consistent.
+     */
+    var timeScale: Double = 1.0
+
+    /** When direct K-line access last talked to a unit (it may keep its session open ~5 s after). */
+    internal var kLineBusyMs: Long? = null
+
+    internal fun now(): Long = clock()
+
+    /** Waits [ms] of car time. */
+    internal suspend fun pause(ms: Long) {
+        if (ms > 0) delay((ms * timeScale).toLong().coerceAtLeast(1))
+    }
+
+    /** Car time in ms since [since] (a [now] value). */
+    internal fun elapsed(since: Long): Long = ((clock() - since) / timeScale).toLong()
+
+    internal fun note(text: String) = log.note(text)
+
     /** Every protocol tried by the last [connectVehicle], for the "why did it not connect" diagnosis. */
     var attempts: List<ProtocolAttempt> = emptyList()
         private set
@@ -96,7 +120,20 @@ class ObdSession(
         attempts = emptyList()
         val tried = mutableSetOf<ObdProtocol>()
         try {
-            if (preferred != null && preferred != ObdProtocol.AUTO) {
+            if (preferred != null && preferred.isCan) {
+                progress("Опит с последния протокол: ${preferred.title}…")
+                tried += preferred
+                if (tryProtocol(preferred, 12_000)) return finishDetection(preferred)
+            }
+            // CAN answers (or fails) in a fraction of a second, a K-line wake-up takes seconds: so a car
+            // with CAN is found at once even when the adapter was last used on an old car.
+            if (preferred != null && preferred != ObdProtocol.AUTO && !preferred.isCan) {
+                for (p in QUICK_CAN) {
+                    if (p in tried) continue
+                    progress("Бърза проверка: ${p.title}…")
+                    tried += p
+                    if (tryProtocol(p, 6_000)) return finishDetection(p)
+                }
                 progress("Опит с последния протокол: ${preferred.title}…")
                 tried += preferred
                 if (tryProtocol(preferred, 12_000)) return finishDetection(preferred)
@@ -134,22 +171,25 @@ class ObdSession(
         if (kLine) {
             // Old control units answer slowly: allow the longest wait, and let the bus rest before a new init.
             runCatching { elm.send("ATSTFF", 2_000) }
-            delay(600)
+            pause(600)
         } else if (p != ObdProtocol.AUTO) {
             runCatching { elm.send("ATST32", 2_000) }
         }
         var firstMs = -1L
         var answer = "няма отговор"
         var ok = false
+        var woke = false
         for (attempt in 0 until if (kLine) 3 else 2) {
             val started = clock()
-            val lines = try {
-                elm.send("0100", timeoutMs)
+            val reply = try {
+                elm.sendDetailed("0100", timeoutMs)
             } catch (e: ElmTimeoutException) {
                 answer = "адаптерът не отговори навреме"
-                emptyList()
+                null
             }
+            val lines = reply?.lines.orEmpty()
             if (firstMs < 0) firstMs = clock() - started
+            if (reply?.busInit == true) woke = true
             if (lines.any { it.replace(" ", "").contains("4100") }) {
                 ok = true
                 answer = "OK"
@@ -157,12 +197,17 @@ class ObdSession(
             }
             val err = ElmErrors.find(lines)
             if (err != null) answer = err else if (lines.isNotEmpty()) answer = lines.joinToString(" | ").take(60)
+            // A unit woke up on the K-line but ignores OBD requests: a car from before OBD2/EOBD.
+            if (woke && err == "NO DATA") answer = "BUS INIT OK, NO DATA"
             // Hard bus errors mean wrong protocol: do not retry. A failed K-line init is retried once,
             // because the first wake-up after switching the ignition on often fails.
             if (err != null && err != "NO DATA" && !(kLine && attempt == 0 && err == "BUS INIT ERROR")) break
-            delay(if (kLine) 1_500 else 300)
+            pause(if (kLine) 1_500 else 300)
         }
-        attemptLog += ProtocolAttempt(p, answer, firstMs.coerceAtLeast(0))
+        attemptLog += ProtocolAttempt(p, answer, firstMs.coerceAtLeast(0), woke)
+        // The unit that woke up keeps its session ~5 s after the adapter moves on: direct K-line
+        // access right after this must wait for it (the real Scénic was asked again 2 s later).
+        if (woke && !ok) kLineBusyMs = clock()
         return ok
     }
 
@@ -177,7 +222,16 @@ class ObdSession(
 
     suspend fun request(cmd: String, timeoutMs: Long = 5_000): ObdReply {
         if (adapterDirty) restoreObdDefaults()
-        val lines = elm.send(cmd, timeoutMs)
+        var lines = elm.send(cmd, timeoutMs)
+        if (ElmErrors.find(lines) == "BUS INIT ERROR" && isKLine(protocol)) {
+            // The adapter lost the link and could not wake the unit again. A unit that was in a
+            // session ignores wake-ups until the session times out (5 s), so wait that out once.
+            val busy = kLineBusyMs
+            val wait = if (busy != null) (P3_WAIT_MS - elapsed(busy)).coerceIn(1_000, P3_WAIT_MS) else P3_WAIT_MS
+            note("K-line: събуждането не успя, нов опит след ${wait / 1000.0} с")
+            pause(wait)
+            lines = elm.send(cmd, timeoutMs)
+        }
         val error = ElmErrors.find(lines)
         val messages = ResponseParser.parse(lines, protocol)
         return ObdReply(lines, messages, error)
@@ -193,12 +247,11 @@ class ObdSession(
     suspend fun restoreObdDefaults() {
         adapterDirty = false
         if (kLineDirty) {
-            // Header, wake-up message and protocol were changed: start from the adapter's defaults.
+            // Header, wake-up message, init address and protocol were changed: reset the adapter.
+            // Not AT D: on the MUCAR clone it keeps the custom header (and echo), so every OBD request
+            // afterwards went to the last K-line unit and the engine never answered again.
             kLineDirty = false
-            runCatching { elm.send("ATD", 3_000) }
-            runCatching { elm.send("ATIB10", 2_000) } // back to the standard K-line speed
-            runCatching { elm.send("ATKW1", 2_000) }
-            applySettings()
+            resetAdapter()
             if (vehicleConnected) runCatching { elm.send("ATSP${protocol.code}", 2_000) }
             runCatching { elm.send(if (protocol.isCan) "ATST32" else "ATSTFF", 2_000) }
             return
@@ -206,9 +259,8 @@ class ObdSession(
         runCatching { elm.send("ATFCSM0", 2_000) }
         val cra = runCatching { elm.send("ATCRA", 2_000) }.getOrNull()
         if (cra == null || ElmErrors.find(cra) == "?") {
-            // Old firmware: full reset of settings, then re-apply ours and the protocol.
-            runCatching { elm.send("ATD", 3_000) }
-            applySettings()
+            // Old firmware: full reset, then re-apply our settings and the protocol.
+            resetAdapter()
             runCatching { elm.send("ATSP${protocol.code}", 2_000) }
         }
         if (protocol.is29bit) {
@@ -223,6 +275,14 @@ class ObdSession(
         // K-line control units can be slow; with adaptive timing this is only the upper limit.
         runCatching { elm.send(if (protocol.isCan) "ATST32" else "ATSTFF", 2_000) }
         runCatching { elm.send("ATAT1", 2_000) }
+    }
+
+    /** AT Z (as at power-up), then this app's settings. */
+    private suspend fun resetAdapter() {
+        val z = runCatching { elm.send("ATZ", 5_000) }
+        if (z.isFailure) runCatching { elm.send("ATD", 3_000) }
+        pause(300)
+        applySettings()
     }
 
     suspend fun batteryVoltage(): Double? {
@@ -370,6 +430,13 @@ class ObdSession(
     private fun ascii(bytes: List<Int>) = bytes.filter { it in 0x20..0x7E }.joinToString("") { it.toChar().toString() }.trim()
 
     companion object {
+        /** A unit leaves its K-line session 5 s (P3max) after the last message; plus a margin. */
+        const val P3_WAIT_MS = 5_500L
+
+        private val QUICK_CAN = listOf(ObdProtocol.CAN_11_500, ObdProtocol.CAN_29_500, ObdProtocol.CAN_11_250, ObdProtocol.CAN_29_250)
+
+        fun isKLine(p: ObdProtocol) = p == ObdProtocol.ISO_9141 || p == ObdProtocol.KWP_SLOW || p == ObdProtocol.KWP_FAST
+
         fun isEngine(header: String): Boolean = header.uppercase() in setOf("7E8", "18DAF110", "10")
 
         /** Friendly name for the sender of an OBD answer. */

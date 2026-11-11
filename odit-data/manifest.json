@@ -74,10 +74,10 @@
   },
   {
    "id": "modules",
-   "version": 3,
+   "version": 4,
    "file": "packs/modules.json",
-   "bytes": 8108,
-   "sha256": "ec22bffcecebbbfac71ec28fa2885e4fa9983a3f8ae9872ae4a42a00b5c70c78",
+   "bytes": 8547,
+   "sha256": "193e6a8392e2c88c742d9c22fc6ad946c7764daf767d789236159a6c6e3a81dc",
    "title": "Имена на модули по марки (CAN адреси)"
   },
   {

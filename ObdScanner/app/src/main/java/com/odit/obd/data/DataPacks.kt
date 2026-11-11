@@ -75,6 +75,7 @@ class DataPacks(
                         m.optString("name").ifEmpty { null },
                         if (m.optString("init") == "slow") KInit.SLOW else KInit.FAST_THEN_SLOW,
                         if (m.optString("codes") == "vag") KCodes.VAG else KCodes.RAW,
+                        m.optBoolean("iso8", false),
                     )
                 }
             }

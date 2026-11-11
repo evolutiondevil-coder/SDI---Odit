@@ -16,16 +16,30 @@ class SimulatedElm(
     private val carProtocol: Char = '6',
     private val chunkSize: Int = 20,
     val scenario: DemoScenario = DemoScenario.NORMAL,
+    /**
+     * Behave like the MUCAR adapter in the real logs: a settings command after a K-line wake-up drops
+     * the link, and AT D keeps the custom header and echo (only AT Z resets everything).
+     */
+    private val cloneQuirks: Boolean = false,
+    /** Speed of simulated time: tests run the car faster (and set the same factor on the session). */
+    private val timeScale: Double = 1.0,
+    /** Clock of the car (the app passes the one it gives the session, so UI tests share virtual time). */
+    private val clock: () -> Long = System::currentTimeMillis,
 ) : ObdTransport {
 
     /** Car for a demo scenario. */
-    constructor(scenario: DemoScenario) : this(
+    constructor(
+        scenario: DemoScenario,
+        cloneQuirks: Boolean = false,
+        timeScale: Double = 1.0,
+        clock: () -> Long = System::currentTimeMillis,
+    ) : this(
         when (scenario) {
             DemoScenario.KLINE -> '5'
             DemoScenario.OLD_RENAULT, DemoScenario.OLD_VW -> 'X' // no OBD2 protocol at all
             else -> '6'
         },
-        20, scenario,
+        20, scenario, cloneQuirks, timeScale, clock,
     )
 
     override val description = "Демо режим (симулатор)"
@@ -91,23 +105,27 @@ class SimulatedElm(
         val vin: String?,
         /** Wakes only with the 5-baud init (VW group). */
         val slowOnly: Boolean = false,
-        /** Speaks VW's KW1281: answers the wake-up with key bytes 01 8A, then nothing an ELM327 understands. */
+        /** Speaks VW's KW1281: sends sync and key bytes 01 8A, then a handshake an ELM327 cannot do. */
         val kw1281: Boolean = false,
         val vag: Boolean = false,
-        /** K-line speed of the unit; it only wakes when the adapter uses the same one (AT IB). */
-        val baud: Int = 10400,
+        /** Key bytes it answers a wake-up with. */
+        val keyWords: Pair<Int, Int> = 0xEF to 0x8F,
+        /** Renault "ISO8": wakes on the 5-baud address 0x33 on ISO 9141, then answers its own address. */
+        val iso8: Boolean = false,
     )
 
     private val kUnits: Map<Int, KUnit> = when (scenario) {
         DemoScenario.OLD_VW -> mapOf(
             // 16684 = P0300 (0x412C), 17978 = P1570 (0x463A), 18010 has no SAE equivalent (0x465A).
             0x01 to KUnit("06A906032HN MARELLI 4LV", mutableListOf(Triple(0x41, 0x2C, 0x23), Triple(0x46, 0x3A, 0x23), Triple(0x46, 0x5A, 0x23)), null, slowOnly = true, vag = true),
-            0x17 to KUnit("1J0920826 KOMBI", mutableListOf(), null, slowOnly = true, kw1281 = true),
+            // The Golf IV cluster of the real log: KWP2000, key bytes 6B 8F. 18010 = immobilizer code (0x465A).
+            0x17 to KUnit("1J0920826 KOMBI+WEGFAHRSPERRE", mutableListOf(Triple(0x46, 0x5A, 0x23)), null, slowOnly = true, vag = true, keyWords = 0x6B to 0x8F),
             0x25 to KUnit("6X0953257 IMMO", mutableListOf(), null, slowOnly = true, kw1281 = true),
-            0x56 to KUnit("1J0035180B RADIO", mutableListOf(), null, slowOnly = true, kw1281 = true, baud = 9600),
+            0x56 to KUnit("1J0035180B RADIO", mutableListOf(), null, slowOnly = true, kw1281 = true),
         )
         else -> mapOf(
-            0x7A to KUnit("SIEMENS SIRIUS32 7700112233", mutableListOf(Triple(0x01, 0x20, 0xA1), Triple(0x03, 0x35, 0x21)), vin),
+            // Like the Renault Scénic I of the real log: wakes at 0x33 with 08 08, ignores OBD requests.
+            0x7A to KUnit("SIEMENS SIRIUS32 7700112233", mutableListOf(Triple(0x01, 0x20, 0xA1), Triple(0x03, 0x35, 0x21)), vin, keyWords = 0x08 to 0x08, iso8 = true),
             0x2C to KUnit("AUTOLIV AB8.0", mutableListOf(Triple(0x00, 0x15, 0x81)), null),
             0x26 to KUnit("UCH N2", mutableListOf(), vin),
         )
@@ -118,36 +136,97 @@ class SimulatedElm(
     /** AT KW0 / KW1: key-word checking during the K-line wake-up. */
     private var keyWordCheck = true
 
-    /** Key bytes of the last wake-up (AT KW). */
+    /** Key bytes of the last wake-up that got them (AT KW keeps them when a later one fails). */
     private var lastKeyWords: Pair<Int, Int>? = null
 
     /** Wake-up address set by AT IIA (slow init). */
     private var initAddress = 0x33
 
-    /** K-line speed set by AT IB 10 / AT IB 96. */
-    private var isoBaud = 10400
+    /** Whether AT AL (long messages) is on. */
+    private var allowLong = false
 
-    /** Address of the unit woken up by the last init, if any. */
+    /** Address of the unit the adapter's K-line link is up with, if any. */
     private var kOpen: Int? = null
+
+    /** Units still in a session after the link to them was dropped: address -> until (ms). They ignore wake-ups. */
+    private val busyUntil = HashMap<Int, Long>()
 
     /** Time the answer being prepared would take on a real adapter. */
     private var pendingDelayMs = 0L
 
-    private fun kAddress(): Int? = if ((header shr 16) == 0x81 && selected in "45") (header shr 8) and 0xFF else null
+    private fun now() = clock()
+
+    /** The link ends; the unit keeps its session for P3max (5 s) after the last keep-alive. */
+    private fun dropLink() {
+        kOpen?.let { busyUntil[it] = now() + (5_000 * timeScale).toLong() }
+        kOpen = null
+    }
+
+    private fun isBusy(addr: Int) = (busyUntil[addr] ?: 0L) > now()
+
+    private fun kAddress(): Int? = if ((header shr 16) == 0x81 && selected in "345") (header shr 8) and 0xFF else null
+
+    /** The ISO8 unit, if this car has one. */
+    private fun iso8Unit(): Pair<Int, KUnit>? = kUnits.entries.firstOrNull { it.value.iso8 }?.toPair()
+
+    /**
+     * A wake-up in the current protocol to [target] (fast init) or to the AT IIA address (5 baud).
+     * Returns the address of the unit that is now linked, or null.
+     */
+    private fun wake(target: Int?): Int? {
+        when (selected) {
+            '5' -> {
+                pendingDelayMs = 350
+                val unit = target?.let { kUnits[it] } ?: return null.also { pendingDelayMs = 2_150 }
+                if (unit.slowOnly || unit.iso8 || isBusy(target)) return null.also { pendingDelayMs = 2_150 }
+                lastKeyWords = unit.keyWords
+                return target
+            }
+            '3', '4' -> {
+                // Sending the address byte at 5 baud alone takes 2 s; no answer at all ends after ~2.55 s.
+                pendingDelayMs = 2_550
+                val iso8 = iso8Unit()
+                val (addr, unit) = when {
+                    initAddress == 0x33 && iso8 != null -> iso8
+                    else -> initAddress to (kUnits[initAddress] ?: return null)
+                }
+                // The ISO8 unit wakes only on ISO 9141 (the real Scénic ignored the same address on protocol 4).
+                if (unit.iso8 && (initAddress != 0x33 || selected != '3')) return null
+                if (isBusy(addr)) return null
+                pendingDelayMs = 2_300
+                lastKeyWords = unit.keyWords.takeUnless { unit.kw1281 } ?: (0x01 to 0x8A)
+                // KW1281 sends a data block where the ELM327 waits for the inverted address.
+                if (unit.kw1281) return null.also { pendingDelayMs = 2_250 }
+                if (selected == '4' && keyWordCheck && unit.keyWords.second != 0x8F) return null
+                if (selected == '3' && keyWordCheck && unit.keyWords != (0x08 to 0x08) && unit.keyWords != (0x94 to 0x94)) return null
+                return addr
+            }
+            else -> return null
+        }
+    }
 
     private fun oldCar(req: IntArray): List<String> {
-        val addr = kAddress() ?: return when (selected) {
-            '0' -> { pendingDelayMs = 3_000; listOf("SEARCHING...", "UNABLE TO CONNECT") }
-            '3', '4' -> { pendingDelayMs = 2_600; listOf("BUS INIT: ...ERROR") } // 5-baud address takes 2 s
-            '5' -> { pendingDelayMs = 400; listOf("BUS INIT: ...ERROR") }
-            '6', '7', '8', '9' -> listOf("CAN ERROR")
-            else -> listOf("NO DATA")
+        val target = kAddress()
+        val prefix = mutableListOf<String>()
+        if (kOpen == null && selected in "345") {
+            val linked = wake(target)
+            if (linked == null) return listOf(if (selected == '5') "BUS INIT: ERROR" else "BUS INIT: ...ERROR")
+            kOpen = linked
+            prefix += if (selected == '5') "BUS INIT: OK" else "BUS INIT: ...OK"
         }
-        val unit = kUnits[addr] ?: return listOf("BUS INIT: ...ERROR")
-        // A KW1281 unit never answers KWP2000 requests.
-        if (unit.kw1281) return listOf("NO DATA")
-        if (kOpen != addr && unit.slowOnly) return listOf("BUS INIT: ...ERROR")
-        val prefix = if (kOpen != addr) { kOpen = addr; listOf("BUS INIT: OK") } else emptyList()
+        if (target == null) {
+            return when (selected) {
+                '0' -> { pendingDelayMs = 3_000; listOf("SEARCHING...", "UNABLE TO CONNECT") }
+                // A unit woke up, but nothing here answers standard OBD requests.
+                '3', '4', '5' -> { pendingDelayMs = 1_000; prefix + "NO DATA" }
+                '6', '7', '8', '9' -> listOf("CAN ERROR")
+                else -> listOf("NO DATA")
+            }
+        }
+        // Only the linked unit listens (in ISO8 that is the unit that woke at 0x33, at its own address).
+        val addr = target.takeIf { it == kOpen }
+        val unit = addr?.let { kUnits[it] }
+        if (unit == null || unit.kw1281) { pendingDelayMs = 1_000; return prefix + "NO DATA" }
         val sid = req[0]
         val answer: IntArray = when {
             sid == 0x10 && req.getOrNull(1) == 0xC0 && !unit.vag -> intArrayOf(0x50, 0xC0)
@@ -165,6 +244,9 @@ class SimulatedElm(
             sid == 0x14 -> { unit.dtcs.clear(); intArrayOf(0x54, 0xFF, 0x00) }
             else -> intArrayOf(0x7F, sid, 0x11)
         }
+        // Without AT AL an ELM327 does not take answers longer than the 7 bytes of OBD messages.
+        if (answer.size > 7 && !allowLong) return prefix + "<DATA ERROR"
+        pendingDelayMs = 60
         // ISO 14230 frame: format (+length), target, source, data, checksum.
         val head = if (answer.size <= 63) listOf(0x80 or answer.size, 0xF1, addr) else listOf(0x80, 0xF1, addr, answer.size)
         val frame = head + answer.toList()
@@ -200,7 +282,7 @@ class SimulatedElm(
             if (echo) out.append(cmd).append('\r')
             val lines = handle(cmd.trim())
             // A real adapter needs time to try to wake a K-line unit up before it gives up.
-            val wait = pendingDelayMs
+            val wait = (pendingDelayMs * timeScale).toLong()
             pendingDelayMs = 0
             if (wait > 0) delay(wait)
             for (line in lines) out.append(line).append('\r')
@@ -230,10 +312,21 @@ class SimulatedElm(
         return obd(req)
     }
 
-    private fun at(c: String): List<String> = when {
+    /** AT commands that only read something: they never drop the K-line link. */
+    private val readOnly = setOf("I", "RV", "DPN", "DP", "KW", "@1")
+
+    private fun at(c: String): List<String> {
+        // The clone drops the K-line link on any settings command (real Golf IV log).
+        if (cloneQuirks && c !in readOnly && c != "SI" && c != "FI") dropLink()
+        return atCommand(c)
+    }
+
+    private fun atCommand(c: String): List<String> = when {
         c == "Z" -> { reset(); listOf("", "ELM327 v1.5") }
         c == "I" -> listOf("ELM327 v1.5")
-        c == "D" -> { reset(); listOf("OK") }
+        c == "D" -> { if (cloneQuirks) partialDefaults() else reset(); listOf("OK") }
+        c == "AL" -> { allowLong = true; listOf("OK") }
+        c == "NL" -> { allowLong = false; listOf("OK") }
         c == "E0" -> { echo = false; listOf("OK") }
         c == "E1" -> { echo = true; listOf("OK") }
         c == "S0" -> { spaces = false; listOf("OK") }
@@ -245,40 +338,33 @@ class SimulatedElm(
         c == "@1" -> listOf("OBDII to RS232 Interpreter")
         c == "KW0" -> { keyWordCheck = false; listOf("OK") }
         c == "KW1" -> { keyWordCheck = true; listOf("OK") }
-        c == "KW" -> lastKeyWords?.let { listOf("1:%02X 2:%02X".format(it.first, it.second)) } ?: listOf("NO DATA")
+        // The MUCAR clone prints the key bytes without leading zeros: "1:8 2:8".
+        c == "KW" -> lastKeyWords?.let { listOf("1:%X 2:%X".format(it.first, it.second)) } ?: listOf("NO DATA")
         c.startsWith("IIA") -> { initAddress = c.substring(3).toInt(16); listOf("OK") }
-        c == "IB10" -> { isoBaud = 10400; listOf("OK") }
-        c == "IB96" -> { isoBaud = 9600; listOf("OK") }
+        c == "IB10" || c == "IB96" -> listOf("OK")
         c == "FI" -> {
-            // A fast init (25 ms pattern + StartCommunication) takes a few hundred ms.
-            pendingDelayMs = 350
-            val addr = kAddress()
-            val unit = addr?.let { kUnits[it] }
-            if (isOldCar && selected == '5' && unit != null && !unit.slowOnly) {
-                kOpen = addr
-                lastKeyWords = 0xEF to 0x8F
-                listOf("BUS INIT: OK")
+            if (isOldCar && selected == '5') {
+                dropLink()
+                wake(kAddress())?.let { kOpen = it; listOf("BUS INIT: OK") } ?: listOf("BUS INIT: ERROR")
             } else {
-                listOf("BUS INIT: ...ERROR")
+                pendingDelayMs = 350
+                listOf("BUS INIT: ERROR")
             }
         }
         c == "SI" -> {
-            // Sending the address byte at 5 baud alone takes 2 s.
-            pendingDelayMs = 2_600
-            val unit = if (isOldCar && selected in "34") kUnits[initAddress]?.takeIf { it.baud == isoBaud } else null
-            when {
-                unit == null -> { lastKeyWords = null; listOf("BUS INIT: ...ERROR") }
-                unit.kw1281 -> {
-                    lastKeyWords = 0x01 to 0x8A
-                    if (keyWordCheck) listOf("BUS INIT: ...ERROR") else listOf("BUS INIT: OK")
-                }
-                else -> { kOpen = initAddress; lastKeyWords = 0xEF to 0x8F; listOf("BUS INIT: OK") }
+            if (isOldCar && selected in "34") {
+                dropLink()
+                wake(null)?.let { kOpen = it; listOf("BUS INIT: ...OK") } ?: listOf("BUS INIT: ...ERROR")
+            } else {
+                // Sending the address byte at 5 baud alone takes 2 s.
+                pendingDelayMs = 2_600
+                listOf("BUS INIT: ...ERROR")
             }
         }
         c == "STI" -> listOf("?") // not an STN chip
         c.startsWith("SPA") -> { selected = '0'; detected = false; listOf("OK") }
         c.startsWith("SP") || c.startsWith("TP") -> {
-            selected = c.last(); detected = false; kOpen = null; listOf("OK")
+            selected = c.last(); detected = false; dropLink(); listOf("OK")
         }
         c.startsWith("SH") -> {
             val h = c.substring(2)
@@ -293,9 +379,18 @@ class SimulatedElm(
     }
 
     private fun reset() {
+        dropLink()
         echo = true; spaces = true; headers = false; header = 0x7DF; session = 1
-        selected = '0'; detected = false; kOpen = null
-        keyWordCheck = true; lastKeyWords = null; initAddress = 0x33; isoBaud = 10400
+        selected = '0'; detected = false
+        keyWordCheck = true; initAddress = 0x33; allowLong = false
+    }
+
+    /** AT D on the clone: settings back, but the header, echo and init address stay (real logs). */
+    private fun partialDefaults() {
+        dropLink()
+        spaces = true; headers = false; session = 1
+        detected = false
+        keyWordCheck = true; allowLong = false
     }
 
     // -------------------------------------------------------------------- car
@@ -313,6 +408,8 @@ class SimulatedElm(
             carProtocol == '6' && header == 0x7DF -> obdFunctional(req)
             carProtocol == '6' -> physical(header, req)
             header == 0x8110F1 -> kLinePhysical(req)
+            // A request with another unit's physical header never reaches the engine's OBD part.
+            carProtocol in "345" && (header shr 16) == 0x81 -> emptyList()
             else -> obdFunctional(req)
         }
         if (answers.isEmpty()) return prefix + "NO DATA"

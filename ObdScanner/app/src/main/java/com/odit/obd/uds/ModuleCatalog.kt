@@ -67,7 +67,8 @@ object ModuleCatalog {
 
     private val builtInKLine: Map<String, List<KLineTarget>> = mapOf(
         // 0x7A is the address Renault's own tools use for the engine (injection) unit.
-        "RENAULT_NISSAN" to listOf(KLineTarget(0x7A, "Двигател (впръскване)")),
+        // Older Renault engines answer the wake-up at 0x33 ("ISO8") and then their own address.
+        "RENAULT_NISSAN" to listOf(KLineTarget(0x7A, "Двигател (впръскване)", iso8 = true)),
         // VW group address words (the numbers VW's own tools show: 01 engine, 03 brakes, 17 cluster...).
         "VAG" to listOf(
             vagK(0x01, "01 Двигател"), vagK(0x03, "03 Спирачки (ABS)"), vagK(0x15, "15 Въздушни възглавници"),
@@ -76,7 +77,7 @@ object ModuleCatalog {
             vagK(0x46, "46 Комфорт"), vagK(0x56, "56 Радио"),
         ),
         "ANY" to listOf(
-            KLineTarget(0x10, null), KLineTarget(0x11, null), KLineTarget(0x7A, null),
+            KLineTarget(0x10, null, iso8 = true), KLineTarget(0x11, null, iso8 = true), KLineTarget(0x7A, null, iso8 = true),
             KLineTarget(0x01, null, KInit.SLOW, KCodes.VAG),
         ),
     )

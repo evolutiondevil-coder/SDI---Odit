@@ -33,14 +33,18 @@ class AdapterCheck(private val s: ObdSession, private val clock: () -> Long = Sy
 
     private suspend fun probe(title: String, command: String, timeoutMs: Long = 2_000): CheckItem {
         val start = clock()
-        val lines = try {
-            s.elm.send(command, timeoutMs)
+        val reply = try {
+            s.elm.sendDetailed(command, timeoutMs)
         } catch (_: ElmTimeoutException) {
-            listOf("(няма отговор)")
+            null
         }
-        val answer = lines.joinToString(" | ").ifBlank { "(празно)" }
+        val lines = reply?.lines ?: listOf("(няма отговор)")
+        // "BUS INIT: ...OK" alone is the whole answer to a successful wake-up: keep it.
+        val woke = if (reply?.busInit == true) listOf("BUS INIT OK") else emptyList()
+        val answer = (woke + lines).joinToString(" | ").ifBlank { "(празно)" }
         val known = when {
             lines.any { it.trim() == "?" } -> false
+            reply?.busInit != null -> true
             lines.isEmpty() || answer == "(няма отговор)" -> null
             else -> true
         }

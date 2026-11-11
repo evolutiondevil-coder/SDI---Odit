@@ -190,10 +190,21 @@ fun ModulesScreen(vm: MainViewModel, snackbar: SnackbarHostState, onShare: (Stri
                         Text(
                             (vm.protocol?.let { "Тази кола използва ${it.title}, а не CAN. " } ?: "Колата не отговори на стандартен OBD2. ") +
                                 "Компютрите ѝ се търсят един по един по стария K-line протокол. Четат се и се изтриват грешки; " +
-                                "кодовете са с номерацията на производителя, затова често са без описание.",
+                                "кодовете са с номерацията на производителя, затова често са без описание. " +
+                                "Отнема около 1–2 минути.",
                             color = Palette.Muted,
                             style = MaterialTheme.typography.bodySmall,
                         )
+                        if (vm.isVagGroup) {
+                            Text(
+                                "При VW, Audi, Škoda и SEAT от това време повечето модули (ABS, въздушни възглавници, " +
+                                    "климатик, радио, ключалки) говорят стария протокол KW1281, който адаптерът в режим ELM327 " +
+                                    "не поддържа — те се четат само със собствения режим на MUCAR (DollarFix+). Двигателят се " +
+                                    "чете по стандартния OBD2 („Грешки на двигателя“), а таблото — оттук, ако е по KWP2000.",
+                                color = Palette.Muted,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                         if (m.scanning) {
                             val progress = if (m.total > 0) m.done.toFloat() / m.total else 0f
                             LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())

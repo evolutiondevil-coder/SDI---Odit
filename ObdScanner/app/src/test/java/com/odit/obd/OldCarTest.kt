@@ -23,14 +23,18 @@ import org.junit.Test
 /** A car from before OBD2: no answer to standard requests, units reachable one by one on the K-line. */
 class OldCarTest {
 
+    private val log = CommLog()
+
+    /** The simulated adapter behaves like the MUCAR clone of the real logs; time runs 5x faster. */
     private fun session(): ObdSession = runBlocking {
-        val log = CommLog()
-        val s = ObdSession(Elm327(SimulatedElm(DemoScenario.OLD_RENAULT), log), log)
+        val s = ObdSession(Elm327(SimulatedElm(DemoScenario.OLD_RENAULT, cloneQuirks = true, timeScale = 0.2), log), log)
+        s.timeScale = 0.2
         s.initAdapter()
         s
     }
 
-    private val targets = listOf(0x7A, 0x01, 0x2C, 0x26).map { KLineTarget(it, null) }
+    // 0x7A is reached like the Scénic I engine: wake-up at 0x33 on ISO 9141 ("ISO8"), then 81 7A F1.
+    private val targets = listOf(KLineTarget(0x7A, null, iso8 = true)) + listOf(0x01, 0x2C, 0x26).map { KLineTarget(it, null) }
 
     @Test
     fun standardObdFailsAndSaysWhy() = runBlocking {
@@ -43,6 +47,10 @@ class OldCarTest {
         assertFalse(s.vehicleConnected)
         val kwp = s.attempts.first { it.protocol == ObdProtocol.KWP_FAST }
         assertEquals("BUS INIT ERROR", kwp.answer)
+        // The engine wakes at 0x33 on ISO 9141 but ignores OBD requests, like the real Scénic.
+        val iso = s.attempts.first { it.protocol == ObdProtocol.ISO_9141 }
+        assertTrue(iso.woke)
+        assertEquals("BUS INIT OK, NO DATA", iso.answer)
         assertTrue(s.attempts.map { it.protocol }.containsAll(listOf(ObdProtocol.AUTO, ObdProtocol.CAN_11_500, ObdProtocol.ISO_9141)))
     }
 
@@ -66,9 +74,15 @@ class OldCarTest {
         assertEquals(1, found[1].dtcs.size)
         assertTrue(found[2].dtcs.isEmpty())
 
+        // Clearing goes the way that worked (ISO8) straight away.
+        val before = log.entries().size
         val (result, again) = direct.clear(listOf(engine)).single()
         assertTrue(result.message, result.ok)
         assertTrue(again!!.dtcs.isEmpty())
+        val sent = log.entries().drop(before).filter { it.dir == CommLog.Dir.TX }.map { it.text }
+        assertTrue(sent.none { it == "ATSP5" })
+        assertTrue(sent.contains("ATSP3"))
+        assertTrue(sent.contains("14FF00"))
     }
 
     @Test

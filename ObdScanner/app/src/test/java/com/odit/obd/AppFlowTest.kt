@@ -269,7 +269,8 @@ class AppFlowTest {
         compose.onNodeWithText("Стара кола без OBD2").performClick()
         pump()
         waitForText("Няма връзка с автомобила", timeoutMs = 300_000)
-        waitForText("най-вероятно колата е отпреди OBD2")
+        // Its engine wakes up on the K-line but ignores OBD requests (like the real Scénic I).
+        waitForText("отговори на събуждането по K-line")
         shot("18_old_car_not_found")
 
         // The VIN field is right there; the VIN identifies the car.
@@ -321,7 +322,7 @@ class AppFlowTest {
         shot("22_old_vw_identified")
 
         click("Директна връзка (стари коли, K-line)")
-        // Engine (KWP2000), cluster and immobiliser (KW1281), radio (KW1281 at 9600 baud).
+        // Engine and cluster (KWP2000), immobiliser and radio (KW1281).
         waitForText("Намерени модули: 4", timeoutMs = 600_000)
         waitForText("VAG 16684 / P0300")
         shot("23_old_vw_modules")
