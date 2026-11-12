@@ -13,6 +13,7 @@ import com.odit.obd.obd.Pids
 import com.odit.obd.obd.Readiness
 import com.odit.obd.sim.SimulatedElm
 import com.odit.obd.uds.DiagType
+import com.odit.obd.uds.ModuleCatalog
 import com.odit.obd.uds.ModuleScanner
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -181,6 +182,27 @@ class ObdSessionTest {
         assertTrue(byTx[0x70E]!!.dtcs.isEmpty())
         // Back to normal OBD afterwards.
         assertEquals(3, s.readDtcs(0x03).size)
+    }
+
+    /**
+     * Real Clio IV log: modules that answer at "request + 0x20" (Renault) or "+ 0x6A" (VW) sent only the
+     * first frame of a long list, because the adapter's automatic flow control went to "reply - 8".
+     * Flow control is now set to each module's request id, so the full list comes at the first try.
+     */
+    @Test
+    fun longModuleAnswersComeAtTheFirstTry() = runBlocking {
+        val log = CommLog()
+        val s = ObdSession(Elm327(SimulatedElm('6'), log), log)
+        s.initAdapter()
+        s.connectVehicle(null) {}
+        val found = ModuleScanner(s).scan(false, Brand.VAG, { _, _, _ -> }, {})
+        // The cluster (0x714 -> 0x77E) has two codes: 11 bytes, more than one CAN frame.
+        val kombi = found.first { it.tx == 0x714 }
+        assertNull(kombi.readError)
+        assertEquals("KOMBI", kombi.identification)
+        val sent = log.entries().filter { it.dir == CommLog.Dir.TX }.map { it.text }
+        assertTrue(sent.contains("ATFCSH714"))
+        assertEquals(ModuleCatalog.quickList(Brand.VAG).size, sent.count { it == "1902FF" })
     }
 
     @Test

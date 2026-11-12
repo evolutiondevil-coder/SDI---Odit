@@ -94,6 +94,10 @@ class OldVwTest {
         assertTrue(results[1].second!!.dtcs.isEmpty())
         // KW1281 units cannot be cleared from here, and the app says why.
         assertEquals(KLineDirect.KW1281_TEXT, results[2].first.message)
+        // The adapter keeps its link when "AT SP 4" is sent on protocol 4 (real Golf IV log: every unit
+        // after the cluster was asked over the cluster's link). The link is closed by switching protocols,
+        // so no full reset is needed.
+        assertTrue(log.entries().none { it.dir == CommLog.Dir.NOTE && it.text.contains("пълно нулиране") })
         // The same unit is never woken twice within its 5 s session: the app waits instead.
         assertTrue(log.entries().any { it.dir == CommLog.Dir.NOTE && it.text.contains("да затвори предишната връзка") })
     }

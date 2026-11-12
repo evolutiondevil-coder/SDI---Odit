@@ -278,7 +278,7 @@ class ObdSession(
     }
 
     /** AT Z (as at power-up), then this app's settings. */
-    private suspend fun resetAdapter() {
+    internal suspend fun resetAdapter() {
         val z = runCatching { elm.send("ATZ", 5_000) }
         if (z.isFailure) runCatching { elm.send("ATD", 3_000) }
         pause(300)

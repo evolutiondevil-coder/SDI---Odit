@@ -63,7 +63,7 @@ class KLineDirect(private val s: ObdSession) {
 
     private enum class Mode(val protocol: Char) { FAST('5'), SLOW('4'), ISO8('3') }
 
-    private enum class Woke { NO, OPEN, KW1281 }
+    private enum class Woke { NO, OPEN, KW1281, UNKNOWN }
 
     /** What [open] found: [first] is the answer to the first request (session start), if any. */
     private class Opened(val woke: Woke, val first: EcuMessage? = null, val keyWords: List<Int>? = null, val mode: Mode? = null)
@@ -126,6 +126,7 @@ class KLineDirect(private val s: ObdSession) {
                 val opened = open(target)
                 val result = when (opened.woke) {
                     Woke.KW1281 -> ClearResult(false, KW1281_TEXT)
+                    Woke.UNKNOWN -> ClearResult(false, unknownText(opened.keyWords))
                     Woke.NO -> ClearResult(false, "Няма отговор от модула")
                     Woke.OPEN -> {
                         val r = request("14FF00", 0x14)
@@ -205,8 +206,7 @@ class KLineDirect(private val s: ObdSession) {
         if (link != null) markBusy(linkAddress)
         // In ISO8 the link to the unit at 0x33 can be kept while only the header changes.
         if (!(mode == Mode.ISO8 && link == Mode.ISO8)) {
-            cmd("ATSP${mode.protocol}")
-            link = null
+            closeLink(mode)
         }
         cmd("ATSH81${a}F1")
         cmd("ATSW96")
@@ -220,6 +220,19 @@ class KLineDirect(private val s: ObdSession) {
             Mode.ISO8 -> { cmd("ATIIA33"); cmd("ATKW0") }
             Mode.FAST -> Unit
         }
+    }
+
+    /**
+     * Ends the adapter's link to the last unit, so that the next request wakes [mode]'s unit up.
+     * Real Golf IV log: on the MUCAR adapter "AT SP 4" while already on protocol 4 keeps the link, so
+     * every unit after the cluster was asked over the cluster's link and never woken up at all.
+     * So: AT PC (protocol close, where known), then another protocol, then the one we want.
+     */
+    private suspend fun closeLink(mode: Mode) {
+        cmd("ATPC")
+        cmd(if (mode.protocol == '3') "ATSP4" else "ATSP3")
+        cmd("ATSP${mode.protocol}")
+        link = null
     }
 
     /** Sends one request; the adapter wakes the bus up first if the link is not up. */
@@ -279,8 +292,19 @@ class KLineDirect(private val s: ObdSession) {
                 }
                 openMode = mode
                 openAddress = initAddr
+                val expectInit = link == null
                 var started = s.now()
                 var a = send(firstReq, mode, initAddr)
+                if (expectInit && a.busInit == null && a.messages.isEmpty() && a.error == "NO DATA") {
+                    // No wake-up although the link was closed: the adapter still holds an old link.
+                    s.note("K-line: адаптерът не затвори старата връзка — пълно нулиране")
+                    s.resetAdapter()
+                    configure(t, mode)
+                    quiet(initAddr)
+                    s.pause(400)
+                    started = s.now()
+                    a = send(firstReq, mode, initAddr)
+                }
                 if (a.busInit == false && isBusy(initAddr)) {
                     // The adapter dropped a link we still needed, and the unit is in its old session.
                     quiet(initAddr)
@@ -311,7 +335,10 @@ class KLineDirect(private val s: ObdSession) {
                 s.note("K-line 0x%02X (%s): няма събуждане след %d ms, ключови байтове %s".format(
                     initAddr, mode.name, ms, kw?.joinToString(" ") { "%02X".format(it) } ?: "—",
                 ))
-                if (kw == KW1281_BYTES && (fresh || ms < SYNC_FAIL_MS)) return Opened(Woke.KW1281, keyWords = kw)
+                // A wake-up that got the unit's sync byte fails later than one nobody answered (real logs).
+                val answered = ms >= ANSWERED_MS
+                if (kw == KW1281_BYTES && (fresh || answered)) return Opened(Woke.KW1281, keyWords = kw)
+                if (answered && mode == Mode.SLOW && kw != null && fresh) return Opened(Woke.UNKNOWN, keyWords = kw)
                 if (mode == Mode.ISO8) iso8Dead = true
             }
         }
@@ -353,10 +380,12 @@ class KLineDirect(private val s: ObdSession) {
         when (opened.woke) {
             Woke.NO -> return null
             Woke.KW1281 -> return module(t, null, emptyList(), KW1281_TEXT, null, null)
+            Woke.UNKNOWN -> return module(t, null, emptyList(), unknownText(opened.keyWords), null, null)
             Woke.OPEN -> Unit
         }
         val vag = t.codes == KCodes.VAG
-        val identReqs = if (vag) listOf("1A9B", "2180") else listOf("2180", "1A9B")
+        // VW's own identification, Renault's, then the standard ISO 14230 ones.
+        val identReqs = if (vag) listOf("1A9B", "1A80", "2180") else listOf("2180", "1A9B", "1A80")
         var ident: String? = null
         for (r in identReqs) {
             val sid = r.substring(0, 2).toInt(16)
@@ -372,15 +401,21 @@ class KLineDirect(private val s: ObdSession) {
         if (renault != null && nrc(renault) == null) {
             dtcs = parseRecords(renault.data, raw = true)
         } else {
-            val std = request("1802FF00", 0x18)?.takeIf { nrc(it) == null } ?: request("1800FF00", 0x18)?.takeIf { nrc(it) == null }
-            if (std != null) {
-                dtcs = if (vag) parseVag(std.data) else parseRecords(std.data, raw = false)
+            val by18 = request("1802FF00", 0x18)
+            val std = by18?.takeIf { nrc(it) == null } ?: request("1800FF00", 0x18)?.takeIf { nrc(it) == null }
+            // Units without service 18 may have the older ISO 14230 one (13) or Renault's (17).
+            val older = if (std == null) {
+                request("13FF00", 0x13)?.takeIf { nrc(it) == null }
+                    ?: (if (vag) request("17FF00", 0x17)?.takeIf { nrc(it) == null } else null)
             } else {
-                error = if (opened.first == null && ident == null && vin == null && renault == null) {
-                    silentText(opened.keyWords)
-                } else {
-                    "Модулът отговаря, но не даде списък с грешки по познатите начини"
-                }
+                null
+            }
+            when {
+                std != null -> dtcs = if (vag) parseVag(std.data) else parseRecords(std.data, raw = false)
+                older != null -> dtcs = if (vag) parseVag(older.data) else parseRecords(older.data, raw = true)
+                opened.first == null && ident == null && vin == null && renault == null && by18 == null ->
+                    error = silentText(opened.keyWords)
+                else -> error = refusedText(nrc(by18))
             }
         }
         // A unit that woke up is there, even if it gave nothing useful.
@@ -391,10 +426,11 @@ class KLineDirect(private val s: ObdSession) {
         private const val ANY = -1
 
         /**
-         * A failed 5-baud wake-up with no answer at all takes ~2.55 s on the MUCAR adapter (real logs);
-         * one that got the unit's sync byte and key bytes fails sooner.
+         * A failed 5-baud wake-up nobody answered takes ~2.55 s on the MUCAR adapter; one where a unit
+         * sent its sync byte and key bytes but the handshake failed takes 2.7–3.0 s (real Golf IV logs:
+         * engine and ABS with 01 8A, KW1281).
          */
-        private const val SYNC_FAIL_MS = 2_450L
+        private const val ANSWERED_MS = 2_650L
 
         private val KW1281_BYTES = listOf(0x01, 0x8A)
 
@@ -414,6 +450,18 @@ class KLineDirect(private val s: ObdSession) {
                 else -> "Модулът се събуди, но не отговори на заявките."
             }
         }
+
+        /** A unit that answered the wake-up with key bytes nobody here speaks. */
+        fun unknownText(kw: List<Int>?): String =
+            "Модулът отговори на събуждането, но с непознати ключови байтове (" +
+                (kw?.joinToString(" ") { "%02X".format(it) } ?: "—") + "). Вероятно говори стар протокол на " +
+                "производителя (при VW — KW1281), който адаптерът в режим ELM327 не поддържа."
+
+        /** A unit that talks KWP2000 but refuses to give its trouble codes. */
+        fun refusedText(nrc: Int?): String =
+            "Модулът отговаря по KWP2000, но отказва стандартното четене на грешки" +
+                (nrc?.let { " (${ModuleScanner.nrcText(it)})" } ?: "") + ". Пробвани са услуги 18, 13 и 17; " +
+                "вероятно иска протокола на производителя. Пратете лога."
 
         /** "1:01 2:8A" (the answer to AT KW) -> [0x01, 0x8A]. */
         fun keyWords(lines: List<String>): List<Int>? {

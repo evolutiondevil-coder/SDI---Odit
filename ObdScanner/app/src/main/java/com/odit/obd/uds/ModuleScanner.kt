@@ -60,6 +60,9 @@ class ModuleScanner(private val s: ObdSession) {
     private var filterAll = false
     private var busErrors = 0
 
+    /** Flow control is sent to the module's own request id (set per module), not left to the adapter. */
+    private var manualFc = false
+
     suspend fun scan(
         full: Boolean,
         brand: Brand,
@@ -147,6 +150,11 @@ class ModuleScanner(private val s: ObdSession) {
         } else {
             ok(cmd("ATCF700")) && ok(cmd("ATCM700"))
         }
+        // On 11-bit CAN the adapter answers a long reply's first frame with flow control to
+        // "reply id - 8", which is right only for the 7E0..7E7 engine ids. VW modules answer at
+        // request + 0x6A, Renault ones at + 0x20: there the module never got it and stopped after the
+        // first frame (real Clio IV log: ABS, UCH and two more lists cut short). So set it per module.
+        manualFc = !s.protocol.is29bit && ok(cmd("ATFCSH7E0")) && ok(cmd("ATFCSD300000")) && ok(cmd("ATFCSM1"))
     }
 
     private suspend fun select(tx: Int, rx: Int) {
@@ -155,6 +163,7 @@ class ModuleScanner(private val s: ObdSession) {
             if (!filterAll) cmd("ATCRA18DAF1%02X".format(tx))
         } else {
             cmd("ATSH%03X".format(tx))
+            if (manualFc) cmd("ATFCSH%03X".format(tx))
             if (!filterAll) cmd("ATCRA%03X".format(rx))
         }
     }
@@ -184,9 +193,13 @@ class ModuleScanner(private val s: ObdSession) {
         if (msgs.isNotEmpty() && msgs.none { it.complete }) {
             val fcId = if (s.protocol.is29bit) "18DA%02XF1".format(tx) else "%03X".format(tx)
             if (ok(cmd("ATFCSH$fcId")) && ok(cmd("ATFCSD300000")) && ok(cmd("ATFCSM1"))) {
+                // The module waits up to 1 s for flow control before it gives up on the first reply;
+                // a request sent before that is ignored (real log: "NO DATA" right after).
+                s.pause(1_100)
                 reply = s.rawRequest(hex, 3_000)
-                cmd("ATFCSM0")
-                msgs = relevant(reply.messages, sid)
+                if (!manualFc) cmd("ATFCSM0")
+                val again = relevant(reply.messages, sid)
+                if (again.any { it.complete } || again.size > msgs.size) msgs = again
             }
         }
         return msgs.firstOrNull { it.complete } ?: msgs.firstOrNull()

@@ -17,8 +17,10 @@ class SimulatedElm(
     private val chunkSize: Int = 20,
     val scenario: DemoScenario = DemoScenario.NORMAL,
     /**
-     * Behave like the MUCAR adapter in the real logs: a settings command after a K-line wake-up drops
-     * the link, and AT D keeps the custom header and echo (only AT Z resets everything).
+     * Behave like the MUCAR adapter in the real logs: AT SI wakes a unit up but leaves no link to use
+     * (the next request wakes it again, and fails while the unit is still in that session); AT SP to the
+     * protocol already selected keeps the K-line link; AT PC is unknown; AT D keeps the custom header
+     * and echo (only AT Z resets everything).
      */
     private val cloneQuirks: Boolean = false,
     /** Speed of simulated time: tests run the car faster (and set the same factor on the session). */
@@ -195,8 +197,9 @@ class SimulatedElm(
                 if (isBusy(addr)) return null
                 pendingDelayMs = 2_300
                 lastKeyWords = unit.keyWords.takeUnless { unit.kw1281 } ?: (0x01 to 0x8A)
-                // KW1281 sends a data block where the ELM327 waits for the inverted address.
-                if (unit.kw1281) return null.also { pendingDelayMs = 2_250 }
+                // KW1281 sends a data block where the ELM327 waits for the inverted address; the adapter
+                // gives up later than when nobody answers (2.7–3.0 s in the real Golf IV logs).
+                if (unit.kw1281) return null.also { pendingDelayMs = 2_900 }
                 if (selected == '4' && keyWordCheck && unit.keyWords.second != 0x8F) return null
                 if (selected == '3' && keyWordCheck && unit.keyWords != (0x08 to 0x08) && unit.keyWords != (0x94 to 0x94)) return null
                 return addr
@@ -312,14 +315,7 @@ class SimulatedElm(
         return obd(req)
     }
 
-    /** AT commands that only read something: they never drop the K-line link. */
-    private val readOnly = setOf("I", "RV", "DPN", "DP", "KW", "@1")
-
-    private fun at(c: String): List<String> {
-        // The clone drops the K-line link on any settings command (real Golf IV log).
-        if (cloneQuirks && c !in readOnly && c != "SI" && c != "FI") dropLink()
-        return atCommand(c)
-    }
+    private fun at(c: String): List<String> = atCommand(c)
 
     private fun atCommand(c: String): List<String> = when {
         c == "Z" -> { reset(); listOf("", "ELM327 v1.5") }
@@ -354,7 +350,11 @@ class SimulatedElm(
         c == "SI" -> {
             if (isOldCar && selected in "34") {
                 dropLink()
-                wake(null)?.let { kOpen = it; listOf("BUS INIT: ...OK") } ?: listOf("BUS INIT: ...ERROR")
+                wake(null)?.let {
+                    // The clone: the unit is now in a session, but the adapter has no link to it.
+                    if (cloneQuirks) busyUntil[it] = now() + (5_000 * timeScale).toLong() else kOpen = it
+                    listOf("BUS INIT: ...OK")
+                } ?: listOf("BUS INIT: ...ERROR")
             } else {
                 // Sending the address byte at 5 baud alone takes 2 s.
                 pendingDelayMs = 2_600
@@ -363,9 +363,15 @@ class SimulatedElm(
         }
         c == "STI" -> listOf("?") // not an STN chip
         c.startsWith("SPA") -> { selected = '0'; detected = false; listOf("OK") }
+        c == "PC" -> if (cloneQuirks) listOf("?") else { dropLink(); detected = false; listOf("OK") }
         c.startsWith("SP") || c.startsWith("TP") -> {
-            selected = c.last(); detected = false; dropLink(); listOf("OK")
+            // The clone keeps the link when the protocol does not change (real Golf IV log).
+            if (!(cloneQuirks && c.last() == selected)) { dropLink(); detected = false }
+            selected = c.last()
+            listOf("OK")
         }
+        c.startsWith("FCSH") -> { fcHeader = c.substring(4).toIntOrNull(16); listOf("OK") }
+        c.startsWith("FCSM") -> { fcManual = c.endsWith("1"); listOf("OK") }
         c.startsWith("SH") -> {
             val h = c.substring(2)
             header = if (h.length == 3) h.toInt(16) else h.takeLast(6).toInt(16)
@@ -380,6 +386,7 @@ class SimulatedElm(
 
     private fun reset() {
         dropLink()
+        fcManual = false; fcHeader = null
         echo = true; spaces = true; headers = false; header = 0x7DF; session = 1
         selected = '0'; detected = false
         keyWordCheck = true; initAddress = 0x33; allowLong = false
@@ -414,7 +421,19 @@ class SimulatedElm(
         }
         if (answers.isEmpty()) return prefix + "NO DATA"
         val lines = mutableListOf<String>()
-        for ((rx, payload) in answers) lines += format(rx, payload)
+        for ((rx, payload) in answers) {
+            val frames = format(rx, payload)
+            // ISO-TP: after its first frame a module waits for flow control at its own request id. The
+            // adapter sends it to "reply id - 8" unless told otherwise (AT FC SH + FC SM 1). Wrong id:
+            // the module stops after the first frame and ignores requests until it gives up (~1 s).
+            val fcTo = if (fcManual) fcHeader else rx - 8
+            if (carProtocol == '6' && header != 0x7DF && payload.size > 7 && headers && fcTo != header) {
+                lines += frames.first()
+                moduleBusyUntil[header] = now() + (1_000 * timeScale).toLong()
+            } else {
+                lines += frames
+            }
+        }
         return prefix + lines
     }
 
@@ -540,9 +559,17 @@ class SimulatedElm(
         else -> emptyList()
     }
 
+    /** Flow control settings (AT FC SH / AT FC SM). */
+    private var fcManual = false
+    private var fcHeader: Int? = null
+
+    /** Modules still waiting for flow control that never came: they ignore requests until then. */
+    private val moduleBusyUntil = HashMap<Int, Long>()
+
     /** Physical (module) addressing: UDS / KWP requests. */
     private fun physical(tx: Int, req: IntArray): List<Pair<Int, IntArray>> {
         val m = modules[tx] ?: return emptyList()
+        if ((moduleBusyUntil[tx] ?: 0L) > now()) return emptyList()
         val sid = req[0]
         val answer: IntArray = when {
             sid == 0x19 && m.uds && req.size >= 3 && req[1] == 0x02 -> {
