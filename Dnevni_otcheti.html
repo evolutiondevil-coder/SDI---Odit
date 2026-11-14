@@ -1454,8 +1454,10 @@
         .gs-row[hidden], .gs-calc[hidden] { display: none; }
         .gs-row.gs-take > span { display: flex; flex-direction: column; }
         .gs-row.gs-take > span small { font-size: .72rem; font-weight: 600; color: var(--gs-mut); opacity: .85; }
-        .gs-row.gs-take > b { color: #059669; }
-        html.dark .gs-row.gs-take > b { color: #34d399; }
+        .gs-row.gs-take { margin-top: -.15rem; font-size: .92em; }
+        .gs-row.gs-take > span { padding-left: .9rem; }
+        .gs-row.gs-take > b { color: var(--gs-mut); font-weight: 700; }
+        @media (max-width: 520px) { .gs-row.gs-take > span { padding-left: 0; } }
         .gs-calc { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .3rem .55rem; margin-top: .6rem; padding-top: .55rem;
             border-top: 1px dashed var(--gs-line); font-size: .74rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--gs-mut); }
         .gs-calc b { margin-left: .25rem; font-size: .92rem; letter-spacing: 0; color: var(--gs-ink); white-space: nowrap; }
@@ -1788,6 +1790,19 @@
         html.dark .gs .gs-scale::before { opacity: .25; }
         html.dark .gs .gs-scale-h > span:first-child, html.dark .gs .gs-scale .gs-leg > div:last-child, html.dark .gs .gs-scale .gs-leg b { color: #e8eef8; }
         html.dark .gs .gs-scale .gs-leg > div { color: #94a3b8; }
+        /* v4.42: на тесен екран сумите и процентът на скалата се смаляват според ширината на картата, вместо да излизат извън нея */
+        .gs .gs-scale { container-type: inline-size; }
+        .gs .gs-scale-h { gap: .5rem; }
+        .gs .gs-scale .gs-pct { flex: none; font-size: min(1.12rem, 5.6cqi); padding: .42em 1em; }
+        .gs .gs-scale .gs-leg > div { min-width: 0; font-size: min(1.12rem, 5.8cqi); }
+        .gs .gs-scale .gs-leg b { font-size: min(1.75rem, 8.6cqi); }
+        @container (max-width: 300px) { .gs .gs-scale .gs-leg > div:last-child { margin-right: 0; } }
+        @container (max-width: 270px) {
+            .gs .gs-scale .gs-leg { flex-direction: column; align-items: stretch; gap: .55rem; }
+            .gs .gs-scale .gs-leg > div { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; font-size: .9rem; }
+            .gs .gs-scale .gs-leg > div:last-child { text-align: left; }
+            .gs .gs-scale .gs-leg b { margin-top: 0; font-size: min(1.4rem, 10cqi); }
+        }
         html.dark .gs .gs-scale .gs-bar { background: linear-gradient(180deg, rgba(0,0,0,.45), rgba(0,0,0,.25));
             box-shadow: inset 0 2px 4px rgba(0,0,0,.55), inset 0 -1px 0 rgba(255,255,255,.06), 0 0 0 1px rgba(255,255,255,.06); }
         /* Цветовете на панела: лъскави точки в капсула, избраният е с пръстен */
@@ -3740,10 +3755,9 @@
                             <div class="gs-card">
                                 <div class="gs-t">Проверка на касата</div>
                                 <div class="gs-row"><span>Очаквана наличност</span><b id="expectedCashDisplay">0,00 EUR</b></div>
+                                <!-- Пояснение: очакваната наличност включва минуса от вчера, върнат в касата от оборота (не се добавя към преброеното) -->
+                                <div class="gs-row gs-take" id="gsTakeRow" hidden><span>в т.ч. върнати от оборота<small>минус от предходен ден</small></span><b id="gsTakeVal"></b></div>
                                 <div class="gs-row"><span>Преброени (банкноти + монети)</span><b id="realCashDisplay">—</b></div>
-                                <!-- Удържаният от оборота минус от вчера се слага в касата -->
-                                <div class="gs-row gs-take" id="gsTakeRow" hidden><span>+ Взети от оборота<small>минус от предходен ден</small></span><b id="gsTakeVal"></b></div>
-                                <div class="gs-row gs-tot" id="gsAfterRow" hidden><span>В касата (с взетите от оборота)</span><b id="gsAfterVal"></b></div>
                                 <div class="gs-diff st-wait" id="gsDiff"><span class="gs-diff-ico" aria-hidden="true"></span><span id="cashDiffLabel" class="gs-diff-l">Още не е преброено</span><span id="cashDiffDisplay" class="gs-diff-v"></span></div>
                                 <!-- Напомняне: касата е на минус, а минус от предходен ден не е въведен -->
                                 <div class="gs-defq" id="gsDefAsk" role="alert" hidden data-html2canvas-ignore="true">
@@ -4492,10 +4506,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.41',
-        date: '13.11.2026',
+        version: '4.42',
+        date: '14.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.42', date: '14.11.2026', notes: [
+                'Поправка в проверката на касата при минус от предходен ден: минусът, върнат в касата от оборота, вече не се добавя още веднъж към преброените пари (излизаше фалшив бакшиш, равен на минуса). Сумата се вижда като пояснение „в т.ч. върнати от оборота“ под „Очаквана наличност“'
+            ] },
             { version: '4.41', date: '13.11.2026', notes: [
                 'Нов вид на горния панел в „WU КОРЕКЦИЯ“ по образеца: светъл матов панел, синя плочка с Western Union, светли бутони „ИЗЧИСТИ“ (стрелката се завърта при посочване) и «'
             ] },
@@ -6169,9 +6186,11 @@
             const totalCoins = parseFloat((coins1 + coins2 + coins3).toFixed(2));
             const totalNotes = parseFloat((notes1 + notes2 + notes3).toFixed(2));
             const totalRealCash = parseFloat((totalNotes + totalCoins).toFixed(2));
-            // Офисът е на плюс и има минус от вчера: той се взима от оборота и се слага в касата
+            // Офисът е на плюс и има минус от вчера: той се взима от оборота и се връща в касата, затова очакваната наличност е
+            // стартовият баланс. v4.42: преброените пари вече включват върнатия минус - той НЕ се добавя още веднъж (иначе
+            // излизаше фалшив бакшиш, равен на минуса). Сумата се показва само като пояснение под „Очаквана наличност“.
             const takenFromTurnover = (finalResult > 0 && absDeficit > 0) ? absDeficit : 0;
-            const cashInRegister = parseFloat((totalRealCash + takenFromTurnover).toFixed(2));
+            const cashInRegister = totalRealCash;
             const cashDiff = parseFloat((cashInRegister - expected).toFixed(2));
             window.gsLastCashDiff = cashDiff;
             
@@ -6184,14 +6203,11 @@
             const diffState = !counted ? 'st-wait' : cashDiff > 0 ? 'st-tip' : cashDiff < 0 ? 'st-minus' : 'st-ok';
             const gsBtn = (kind, amount) => `<button data-html2canvas-ignore="true" onclick="openTipDiffModal('${kind}', ${amount})" class="gs-act${kind === 'take' ? '' : ' gs-act-add'}">${kind === 'take' ? 'ВЗЕМИ' : 'ДОБАВИ'}</button>`;
             if (realCashDisplay) realCashDisplay.innerHTML = counted ? formatCurrencySmall(totalRealCash) : '—';
-            const takeRow = document.getElementById('gsTakeRow'), afterRow = document.getElementById('gsAfterRow');
-            if (takeRow && afterRow) {
-                const showTake = counted && takenFromTurnover > 0;
-                takeRow.hidden = afterRow.hidden = !showTake;
-                if (showTake) {
-                    document.getElementById('gsTakeVal').innerHTML = formatCurrencySmall(takenFromTurnover);
-                    document.getElementById('gsAfterVal').innerHTML = formatCurrencySmall(cashInRegister);
-                }
+            const takeRow = document.getElementById('gsTakeRow');
+            if (takeRow) {
+                const showTake = takenFromTurnover > 0;
+                takeRow.hidden = !showTake;
+                if (showTake) document.getElementById('gsTakeVal').innerHTML = formatCurrencySmall(takenFromTurnover);
             }
             if (diffBox) diffBox.className = `gs-diff ${diffState}`;
             if (diffDisplay && diffLabel) {
@@ -6239,7 +6255,7 @@
                 if (pctEl) pctEl.textContent = !counted ? '0 %' : (expected > 0 ? (ratio * 100).toFixed(1).replace('.', ',') + ' %' : '—');
                 const ce = document.getElementById('gsScaleCounted'), ee = document.getElementById('gsScaleExpected');
                 if (ce) ce.innerHTML = counted ? formatCurrencySmall(cashInRegister) : '—';
-                const cl = document.getElementById('gsScaleCountedL'); if (cl) cl.textContent = takenFromTurnover > 0 ? 'В касата' : 'Преброени';
+                const cl = document.getElementById('gsScaleCountedL'); if (cl) cl.textContent = 'Преброени';
                 if (ee) ee.innerHTML = formatCurrencySmall(expected);
             }
 
@@ -7911,7 +7927,7 @@
                     const absDef = r2(Math.abs(num(S.deficit)));
                     const finalResult = r2(totalResult - absDef);
                     const expected = finalResult > 0 ? r2(open) : r2(open - absDef + totalResult);
-                    const diff = r2(cash + (finalResult > 0 ? absDef : 0) - expected);   // взетият от оборота минус от вчера отива в касата
+                    const diff = r2(cash - expected);   // преброените пари вече включват минуса от вчера, върнат в касата от оборота
                     const tag = S.title;
 
                     if (label === 'A') {
@@ -7944,6 +7960,16 @@
                     regs: {
                         1: { prem: ['250.50', '100'], in: '300', out: '900', notes: '1300', coins: '0.50' },
                         2: { prem: ['80'], in: '', out: '', notes: '', coins: '' },
+                        3: { prem: [''], in: '', out: '', notes: '', coins: '' }
+                    }
+                });
+
+                // В: печалба + минус от предходен ден (минусът е върнат в касата от оборота; касата е точна - без фалшив бакшиш)
+                runScenario('C', {
+                    title: 'Печалба с минус от вчера', open: '1540', deficit: '311.94',
+                    regs: {
+                        1: { prem: ['424.25', '', '40.56'], in: '', out: '', notes: '1460', coins: '30.60' },
+                        2: { prem: [''], in: '', out: '', notes: '', coins: '49.40' },
                         3: { prem: [''], in: '', out: '', notes: '', coins: '' }
                     }
                 });
