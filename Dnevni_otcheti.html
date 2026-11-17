@@ -4555,10 +4555,14 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.45',
+        version: '4.46',
         date: '17.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.46', date: '17.11.2026', notes: [
+                'Калкулаторът на цял екран: „Стартов баланс + Допълнително“ и „Търсена сума“ са горе вдясно - срещу логото „Калкулатор Банкноти“',
+                'Два бутона „ИЗЧИСТИ“ в ушички над панела (слети с него): левият изчиства само банкнотите, десният - търсената сума и монетите'
+            ] },
             { version: '4.45', date: '17.11.2026', notes: [
                 'Калкулаторът на цял екран: ново поле „Сбор банкноти“ под банкнотите (вдясно) - сборът само на калкулатора за банкноти',
                 'Калкулаторът на цял екран е по-широк и по-висок (по-едър и по-четлив): на компютър взима цялата височина, „Затвори“ е в горния десен ъгъл'
@@ -6922,7 +6926,7 @@
         // v4.45: „Сбор банкноти“ - под банкнотите (вдясно), сборът само на калкулатора за банкноти
         const NF_EXTRA_CSS = `
             .nf-cols { gap: 2.2rem; }
-            .nf-n2 > .nf-c:first-child > :first-child { margin-bottom: 0 !important; }
+            .nf-n2 > .nf-c:first-child > :nth-child(2) { margin-bottom: 0 !important; }   /* банкнотите (след логото) */
             .nf-bnsum { align-self: flex-end; margin-top: 1.15rem; display: flex; align-items: center; gap: .8rem; min-width: 64%; padding: .65rem 1.5rem .65rem .85rem; border-radius: 9999px;
                 background: linear-gradient(180deg, rgba(240,253,247,.97) 0%, rgba(209,250,229,.9) 100%); border: 1.5px solid #a7f3d0;
                 box-shadow: inset 0 1.5px 0 #fff, 0 0 0 1px rgba(4,120,87,.12), 0 12px 24px -16px rgba(4,90,60,.5); }
@@ -6936,8 +6940,18 @@
                 text-shadow: 0 1px 0 rgba(255,255,255,.8); }
             .nf-bnsum > b > span { font-size: .7em; margin-left: .25em; }
             .is-export .nf-bnsum { box-shadow: none; }
+            /* v4.46: двата бутона „ИЗЧИСТИ“ са в ушички над панела - панелът и ушичките са една обща форма (SVG), без шев */
+            #calcSection > div.nf-shell { position: relative; box-shadow: none !important; background: none !important; }
+            .nf-shell.is-on { padding-top: 58px; }
+            .nf-shape { position: absolute; left: 0; top: 0; display: none; overflow: visible; pointer-events: none; z-index: 0;
+                filter: drop-shadow(0 16px 20px rgba(10,44,78,.22)) drop-shadow(0 2px 4px rgba(10,44,78,.08)); }
+            .nf-shell.is-on .nf-shape { display: block; }
+            html.nf-embed #calcSection #calculatorContainer.nf-shaped { background: none !important; border-color: transparent !important; box-shadow: none !important; }
+            .nf-tab { position: absolute; top: 0; z-index: 20; height: 58px; padding: 11px 12px 0; display: none; align-items: flex-start; justify-content: center; }
+            .nf-shell.is-on .nf-tab { display: flex; }
+            .nf-n2 .nf-head > .bn-clear { display: none !important; }
         `;
-        let nfOv = null, nfFrame = null, nfReady = false, nfN = 0, nfItems = null, nfHideT = 0;
+        let nfOv = null, nfFrame = null, nfReady = false, nfN = 0, nfItems = null, nfHideT = 0, nfTabs = null, nfLastH = 0;
         function nfDoc() { try { return nfFrame && nfFrame.contentDocument; } catch (e) { return null; } }
         function nfSource() {
             const el = document.getElementById('nfCalcSrc');
@@ -6974,7 +6988,33 @@
             const bnSum = d.createElement('div'); bnSum.className = 'nf-bnsum'; bnSum.setAttribute('aria-live', 'polite');
             const bnIco = d.querySelector('#cmSplit .cm-part img');
             bnSum.innerHTML = (bnIco ? `<img src="${bnIco.src}" alt="" draggable="false">` : '') + '<span><small>Сбор банкноти</small><em>само калкулатора за банкноти</em></span><b id="nfBnSumVal">0<span>€</span></b>';
+            // заглавието (логото) влиза в лявата колона; панелът се увива в „обвивка“ с обща форма и две ушички с „ИЗЧИСТИ“
+            const head = card.querySelector(':scope > .flex.items-center.justify-between');
+            if (head) head.classList.add('nf-head');
+            const shell = d.createElement('div'); shell.className = 'nf-shell';
+            card.parentNode.insertBefore(shell, card); shell.appendChild(card);
+            const svg = d.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('class', 'nf-shape'); svg.setAttribute('aria-hidden', 'true');
+            svg.innerHTML = '<defs><linearGradient id="nfSheen" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity=".58"/><stop offset=".36" stop-color="#fff" stop-opacity=".12"/>'
+                + '<stop offset=".64" stop-color="#fff" stop-opacity=".02"/><stop offset="1" stop-color="#fff" stop-opacity=".32"/></linearGradient></defs>'
+                + '<path class="o" fill="none" stroke="rgba(20,72,110,.13)" stroke-width="2.5"/><path class="f" fill="rgba(255,255,255,.64)"/><path class="sh" fill="url(#nfSheen)"/>'
+                + '<path class="e" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="1.2"/>';
+            shell.insertBefore(svg, card);
+            const clr0 = head && head.querySelector('.bn-clear');
+            const mkTab = (side, title, fn) => {
+                const t = d.createElement('div'); t.className = 'nf-tab nf-tab-' + side;
+                const b = clr0 ? clr0.cloneNode(true) : d.createElement('button');
+                b.removeAttribute('onclick'); b.type = 'button'; b.title = title; b.setAttribute('aria-label', title);
+                b.addEventListener('click', fn); t.appendChild(b); shell.appendChild(t); return t;
+            };
+            nfTabs = { l: mkTab('l', 'Изчисти банкнотите (лявото поле)', nfClearLeft), r: mkTab('r', 'Изчисти търсената сума и монетите (дясното поле)', nfClearRight) };
+            if (w.ResizeObserver) new w.ResizeObserver(() => {
+                nfShape();
+                const h = card.offsetHeight;
+                if (nfN === 2 && Math.abs(h - nfLastH) > 2) { clearTimeout(nfFit._r); nfFit._r = setTimeout(nfFit, 60); }
+            }).observe(card);
             nfItems = {
+                head: head,
                 bnsum: bnSum,
                 tgt: d.getElementById('cmTarget'), bn: bn200 ? bn200.closest('.bn-row').parentElement : null, coins: d.getElementById('coinSection'),
                 split: d.getElementById('cmSplit'), sum: card && card.querySelector('.bn-sum'), diff: d.getElementById('cmDiffWrap'), dl: card && card.querySelector('.cm-dl')
@@ -7020,14 +7060,65 @@
         function nfArrange(n) {
             const d = nfDoc(), card = d && d.getElementById('calculatorContainer');
             if (!card || !nfItems) return;
-            const L = { 1: [['tgt', 'bn', 'coins', 'split', 'sum', 'diff', 'dl']], 2: [['bn', 'bnsum'], ['tgt', 'coins', 'split', 'sum', 'diff', 'dl']] }[n];
+            // v4.46: на компютър търсената сума е горе вдясно - срещу логото
+            const L = { 1: [['head', 'tgt', 'bn', 'coins', 'split', 'sum', 'diff', 'dl']], 2: [['head', 'bn', 'bnsum'], ['tgt', 'coins', 'split', 'sum', 'diff', 'dl']] }[n];
             const cols = d.createElement('div'); cols.className = 'nf-cols nf-n' + n;
             L.forEach(list => { const c = d.createElement('div'); c.className = 'nf-c'; list.forEach(k => { if (nfItems[k]) c.appendChild(nfItems[k]); }); cols.appendChild(c); });
             const old = card.querySelector(':scope > .nf-cols');
             if (old) old.replaceWith(cols);
-            else { const head = card.querySelector(':scope > .flex.items-center.justify-between'); if (head) head.after(cols); else card.appendChild(cols); }
+            else card.appendChild(cols);
             card.style.setProperty('--nf-w', { 1: '41rem', 2: '92rem' }[n]);   // v4.45: по-широк (колоните са по-широки)
             nfN = n;
+            nfShape();
+        }
+        // общата форма на панела и ушичките (SVG): същото стъкло и отблясък като панела, ушичките са слети с него без шев
+        function nfShape() {
+            const d = nfDoc(), card = d && d.getElementById('calculatorContainer'), shell = card && card.parentNode;
+            if (!shell || !shell.classList || !shell.classList.contains('nf-shell')) return;
+            const on = nfN === 2;
+            shell.classList.toggle('is-on', on); card.classList.toggle('nf-shaped', on);
+            if (!on || !nfTabs) return;
+            const W = card.offsetWidth, H = card.offsetHeight, TH = 58, R = 40, RT = 18, RF = 16;
+            if (!W || !H) return;
+            const cr = card.getBoundingClientRect(), k = cr.width / W || 1;
+            const cols = card.querySelectorAll(':scope > .nf-cols > .nf-c');
+            const tabs = [];
+            [['l', 0], ['r', 1]].forEach(([side, i]) => {
+                const t = nfTabs[side], c = cols[i];
+                if (!t || !c) return;
+                const tw = t.offsetWidth;
+                let x = (c.getBoundingClientRect().right - cr.left) / k - tw - 6;   // над дясната част на колоната
+                x = Math.round(Math.max(R + RF, Math.min(W - R - RF - tw, x)));
+                t.style.left = x + 'px';
+                tabs.push([x, tw]);
+            });
+            tabs.sort((a, b) => a[0] - b[0]);
+            let p = `M0 ${TH + R} A${R} ${R} 0 0 1 ${R} ${TH}`;
+            tabs.forEach(([x, tw]) => {
+                p += ` L${x - RF} ${TH} A${RF} ${RF} 0 0 0 ${x} ${TH - RF} L${x} ${RT} A${RT} ${RT} 0 0 1 ${x + RT} 0 L${x + tw - RT} 0`
+                   + ` A${RT} ${RT} 0 0 1 ${x + tw} ${RT} L${x + tw} ${TH - RF} A${RF} ${RF} 0 0 0 ${x + tw + RF} ${TH}`;
+            });
+            p += ` L${W - R} ${TH} A${R} ${R} 0 0 1 ${W} ${TH + R} L${W} ${TH + H - R} A${R} ${R} 0 0 1 ${W - R} ${TH + H} L${R} ${TH + H} A${R} ${R} 0 0 1 0 ${TH + H - R} Z`;
+            const svg = shell.querySelector(':scope > .nf-shape');
+            svg.setAttribute('width', W); svg.setAttribute('height', TH + H); svg.setAttribute('viewBox', `0 0 ${W} ${TH + H}`);
+            svg.querySelectorAll('path').forEach(e => e.setAttribute('d', p));
+            const g = svg.querySelector('#nfSheen'), q = (W + H) / 4;   // отблясъкът на панела: 135°, както в стъклото на калкулатора
+            g.setAttribute('x1', W / 2 - q); g.setAttribute('y1', TH + H / 2 - q); g.setAttribute('x2', W / 2 + q); g.setAttribute('y2', TH + H / 2 + q);
+        }
+        // „ИЗЧИСТИ“ в ушичките: лявата - само банкнотите; дясната - търсената сума и монетите (махнатите каси си остават махнати)
+        function nfClearLeft() {
+            const d = nfDoc(), w = nfFrame && nfFrame.contentWindow;
+            if (!d || !w) return;
+            NF_DENOMS.forEach(n => { const i = d.getElementById('bnCount' + n); if (i) i.value = ''; });
+            w.calcBN();
+        }
+        function nfClearRight() {
+            const d = nfDoc(), w = nfFrame && nfFrame.contentWindow;
+            if (!d || !w) return;
+            [1, 2, 3].forEach(k => { const i = d.getElementById('cnAmt' + k); if (i) i.value = ''; });
+            const ex = d.getElementById('cmExtraAmt'); if (ex) ex.value = '';
+            if (typeof w.setBaseOn === 'function') w.setBaseOn(false);   // отметката се маха, сумата на стартовия баланс остава
+            w.calcBN();
         }
         // мащаб: калкулаторът да излезе възможно най-голям и да се събере целият (на телефон - по ширина, с превъртане)
         function nfFit() {
@@ -7047,7 +7138,12 @@
             }
             if (nfN !== 2) nfArrange(2);
             sec.style.zoom = '';
+            const dw = d.getElementById('cmDiffWrap'), dwHid = dw && dw.classList.contains('hidden');
+            if (dwHid) dw.classList.remove('hidden');   // мястото на „Разлика / Бакшиш“ се пази - мащабът не скача, когато се появи
             const m = { w: sec.offsetWidth, h: sec.offsetHeight };
+            if (dwHid) dw.classList.add('hidden');
+            const cardEl = d.getElementById('calculatorContainer'); nfLastH = cardEl ? cardEl.offsetHeight : 0;
+            nfShape();
             const side = Math.min(140, Math.round(W * .09));   // място за „Затвори“ в ъгъла
             let z = Math.min((H - 10) / m.h, (W - 2 * side) / m.w, 1.3);
             let scroll = false;
