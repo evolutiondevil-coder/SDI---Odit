@@ -4558,10 +4558,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.47',
+        version: '4.48',
         date: '17.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.48', date: '17.11.2026', notes: [
+                'Калкулаторът на цял екран: бутонът „Свали всичко“ е по-малък'
+            ] },
             { version: '4.47', date: '17.11.2026', notes: [
                 'Калкулаторът на цял екран: бутон за копиране в „Сбор банкноти“ (копира сбора на банкнотите)',
                 'След затваряне на калкулатора на цял екран банкнотите, променени там, проблясват в зелено в калкулатора за банкноти на приложението'
@@ -6961,6 +6964,8 @@
             .nf-bnsum-copy.is-done { color: #fff; border-color: #047857; background: linear-gradient(180deg, #34d399 0%, #10b981 45%, #047857 100%); }
             .nf-bnsum-copy.is-done .i-copy { opacity: 0; transform: scale(.4); }
             .nf-bnsum-copy.is-done .i-ok { opacity: 1; transform: none; }
+            /* v4.48: по-малък бутон „Свали всичко“ (колкото „Сбор банкноти“) - надписът се смалява заедно с него */
+            .nf-cols .cm-dl .dl-btn.dl-glass { max-width: 16rem; }
             /* v4.46: двата бутона „ИЗЧИСТИ“ са в ушички над панела - панелът и ушичките са една обща форма (SVG), без шев */
             #calcSection > div.nf-shell { position: relative; box-shadow: none !important; background: none !important; }
             .nf-shell.is-on { padding-top: 58px; }
