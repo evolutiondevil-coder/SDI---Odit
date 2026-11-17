@@ -345,8 +345,8 @@
         .nf-frame { flex: 1 1 auto; display: block; width: 100%; min-height: 0; border: 0; background: transparent; color-scheme: light; }
         .nf-hint { flex: none; margin: .35rem 0 .75rem; padding: .45rem 1rem; border-radius: 999px; font: 700 .78rem/1 Inter, 'Segoe UI', sans-serif; color: #14532d; background: rgba(255,255,255,.75); }
         @media (max-width: 640px) { .nf-ttl { padding: 0 6.2rem 0 0; text-align: left; font-size: .66rem; letter-spacing: .08em; } .nf-hint { display: none; } }
-        /* v4.44: по-нисък екран (лаптоп) - без надписа отгоре и подсказката отдолу, „Затвори“ е в ъгъла; калкулаторът взима цялата височина */
-        @media (max-height: 820px) and (min-width: 641px) {
+        /* v4.44/v4.45: на компютър - без надписа отгоре и подсказката отдолу, „Затвори“ е в ъгъла; калкулаторът взима цялата височина */
+        @media (min-width: 641px) {
             .nf-bar { position: absolute; z-index: 2; top: .7rem; right: .9rem; width: auto; height: 2.3rem; }
             .nf-ttl, .nf-hint { display: none; }
             .nf-close { position: static; transform: none; }
@@ -4555,10 +4555,14 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.44',
+        version: '4.45',
         date: '17.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.45', date: '17.11.2026', notes: [
+                'Калкулаторът на цял екран: ново поле „Сбор банкноти“ под банкнотите (вдясно) - сборът само на калкулатора за банкноти',
+                'Калкулаторът на цял екран е по-широк и по-висок (по-едър и по-четлив): на компютър взима цялата височина, „Затвори“ е в горния десен ъгъл'
+            ] },
             { version: '4.44', date: '17.11.2026', notes: [
                 'Калкулаторът „Банкноти и Монети“ на цял екран е винаги в 2 колони: вляво банкнотите, вдясно най-горе търсената сума, под нея монетите, „банкноти + монети“, общо, разликата и свалянето'
             ] },
@@ -6915,6 +6919,24 @@
         // разликата и свалянето (v4.44); на телефон - една колона, както е в отделното приложение.
         const NF_DENOMS = [200, 100, 50, 20, 10, 5];
         const NF_EMBED_CSS = '<style id="nf-embed-css">\nhtml.nf-embed, html.nf-embed body { background: transparent !important; background-image: none !important; }\nhtml.nf-embed body { margin: 0; padding: 0 !important; min-height: 100vh !important; display: flex; align-items: center; justify-content: center; }\nhtml.nf-embed.nf-scroll body { align-items: flex-start; }\nhtml.nf-embed #glassBackdrop { display: none; }\nhtml.nf-embed #calcSection.cm-wrap { flex: none; max-width: none; margin: 0; padding: 14px; }\nhtml.nf-embed #calculatorContainer { width: var(--nf-w, 41rem); max-width: none; }\n.nf-cols { position: relative; z-index: 10; display: flex; align-items: flex-start; gap: 1.6rem; }\n.nf-c { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }\n.nf-c > :first-child { margin-top: 0 !important; }\n.nf-c > :last-child { margin-bottom: 0 !important; }\n.nf-n1 { display: block; }\n.nf-n1 > .nf-c { display: block; }\n.nf-n2 .bn-sum { margin-top: 0; }\n.nf-n2 .cm-dl { margin-top: 1.4rem; }\n.nf-n2 .v3 { margin-bottom: 1.3rem; }\nhtml.nf-embed.nf-narrow body { display: block; min-height: 0 !important; }\nhtml.nf-embed.nf-narrow #calcSection.cm-wrap { max-width: 41rem; margin: 0 auto; padding: 8px 8px 16px; }\nhtml.nf-embed.nf-narrow #calculatorContainer { width: auto; }\n/* иконките реагират при посочване (всяка сама), както в приложението */\n.cn-head-ico img, .cn-reg, .cm-part img, .v3-res img { transition: transform .45s cubic-bezier(.34,1.5,.64,1), filter .3s ease; }\n.cn-head-ico img:hover { transform: translateY(-2px) scale(1.1) rotate(-6deg); }\n.cn-reg:hover { transform: translateY(-2px) scale(1.12) rotate(-5deg); }\n.cm-part img:hover { transform: translateY(-2px) scale(1.12) rotate(-6deg); filter: drop-shadow(0 5px 6px rgba(20,50,85,.35)); }\n.v3-res img:hover { transform: scale(1.1) rotate(-5deg); }\n<\/style>\n';
+        // v4.45: „Сбор банкноти“ - под банкнотите (вдясно), сборът само на калкулатора за банкноти
+        const NF_EXTRA_CSS = `
+            .nf-cols { gap: 2.2rem; }
+            .nf-n2 > .nf-c:first-child > :first-child { margin-bottom: 0 !important; }
+            .nf-bnsum { align-self: flex-end; margin-top: 1.15rem; display: flex; align-items: center; gap: .8rem; min-width: 64%; padding: .65rem 1.5rem .65rem .85rem; border-radius: 9999px;
+                background: linear-gradient(180deg, rgba(240,253,247,.97) 0%, rgba(209,250,229,.9) 100%); border: 1.5px solid #a7f3d0;
+                box-shadow: inset 0 1.5px 0 #fff, 0 0 0 1px rgba(4,120,87,.12), 0 12px 24px -16px rgba(4,90,60,.5); }
+            .nf-bnsum img { flex: none; display: block; height: 2.4rem; width: auto; filter: drop-shadow(0 2px 3px rgba(20,50,85,.3)); user-select: none;
+                transition: transform .45s cubic-bezier(.34,1.5,.64,1), filter .3s ease; }
+            .nf-bnsum img:hover { transform: translateY(-2px) scale(1.12) rotate(-6deg); filter: drop-shadow(0 5px 6px rgba(20,50,85,.35)); }
+            .nf-bnsum > span { display: flex; flex-direction: column; min-width: 0; line-height: 1.1; }
+            .nf-bnsum small { font-family: 'Open Sans', 'Segoe UI', Roboto, sans-serif; font-weight: 800; font-size: .84rem; letter-spacing: .12em; text-transform: uppercase; color: #1f5135; white-space: nowrap; }
+            .nf-bnsum em { margin-top: .22rem; font-style: normal; font-family: Inter, sans-serif; font-size: .68rem; font-weight: 700; color: #64748b; white-space: nowrap; }
+            .nf-bnsum > b { margin-left: auto; padding-left: .8rem; font-family: system-ui, sans-serif; font-weight: 900; font-size: 2rem; letter-spacing: -.5px; color: #065f46; white-space: nowrap;
+                text-shadow: 0 1px 0 rgba(255,255,255,.8); }
+            .nf-bnsum > b > span { font-size: .7em; margin-left: .25em; }
+            .is-export .nf-bnsum { box-shadow: none; }
+        `;
         let nfOv = null, nfFrame = null, nfReady = false, nfN = 0, nfItems = null, nfHideT = 0;
         function nfDoc() { try { return nfFrame && nfFrame.contentDocument; } catch (e) { return null; } }
         function nfSource() {
@@ -6929,7 +6951,7 @@
             nfOv.className = 'nf-ov'; nfOv.hidden = true;
             nfOv.setAttribute('role', 'dialog'); nfOv.setAttribute('aria-modal', 'true'); nfOv.setAttribute('aria-label', 'Калкулатор Банкноти и Монети на цял екран');
             nfOv.innerHTML = '<div class="nf-bar"><span class="nf-ttl">Калкулатор Банкноти и Монети · режим на фокус</span>'
-                + '<button type="button" class="nf-close" title="Затвори (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span>Затвори</span></button></div>'
+                + '<button type="button" class="nf-close" title="Затвори (Esc или клик извън калкулатора)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span>Затвори</span></button></div>'
                 + '<iframe class="nf-frame" title="Калкулатор Банкноти и Монети"></iframe>'
                 + '<div class="nf-hint">Esc или клик извън калкулатора - връщане</div>';
             document.body.appendChild(nfOv);
@@ -6944,11 +6966,16 @@
             if (!d || !w || typeof w.calcBN !== 'function') return;
             // всяко смятане в калкулатора връща банкнотите в приложението; мащабът се смята от тук
             const orig = w.calcBN;
-            w.calcBN = function () { const r = orig.apply(this, arguments); nfPushToMain(); return r; };
+            w.calcBN = function () { const r = orig.apply(this, arguments); nfBnSumUpdate(); nfPushToMain(); return r; };
             w.fitCalc = function () { nfFit(); };
             const card = d.getElementById('calculatorContainer');
             const bn200 = d.getElementById('bnCount200');
+            const st = d.createElement('style'); st.id = 'nf-extra-css'; st.textContent = NF_EXTRA_CSS; d.head.appendChild(st);
+            const bnSum = d.createElement('div'); bnSum.className = 'nf-bnsum'; bnSum.setAttribute('aria-live', 'polite');
+            const bnIco = d.querySelector('#cmSplit .cm-part img');
+            bnSum.innerHTML = (bnIco ? `<img src="${bnIco.src}" alt="" draggable="false">` : '') + '<span><small>Сбор банкноти</small><em>само калкулатора за банкноти</em></span><b id="nfBnSumVal">0<span>€</span></b>';
             nfItems = {
+                bnsum: bnSum,
                 tgt: d.getElementById('cmTarget'), bn: bn200 ? bn200.closest('.bn-row').parentElement : null, coins: d.getElementById('coinSection'),
                 split: d.getElementById('cmSplit'), sum: card && card.querySelector('.bn-sum'), diff: d.getElementById('cmDiffWrap'), dl: card && card.querySelector('.cm-dl')
             };
@@ -6964,6 +6991,12 @@
             nfReady = true; nfN = 0;
             nfSyncFromMain();
             nfFit();
+        }
+        function nfBnSumUpdate() {
+            const d = nfDoc(), el = d && d.getElementById('nfBnSumVal');
+            if (!el) return;
+            const t = NF_DENOMS.reduce((a, n) => { const i = d.getElementById('bnCount' + n); return a + (i ? (parseInt(i.value) || 0) * n : 0); }, 0);
+            el.innerHTML = String(t) + '<span>€</span>';
         }
         // приложение -> калкулатор: банкнотите и стартовият баланс
         function nfSyncFromMain() {
@@ -6987,13 +7020,13 @@
         function nfArrange(n) {
             const d = nfDoc(), card = d && d.getElementById('calculatorContainer');
             if (!card || !nfItems) return;
-            const L = { 1: [['tgt', 'bn', 'coins', 'split', 'sum', 'diff', 'dl']], 2: [['bn'], ['tgt', 'coins', 'split', 'sum', 'diff', 'dl']] }[n];
+            const L = { 1: [['tgt', 'bn', 'coins', 'split', 'sum', 'diff', 'dl']], 2: [['bn', 'bnsum'], ['tgt', 'coins', 'split', 'sum', 'diff', 'dl']] }[n];
             const cols = d.createElement('div'); cols.className = 'nf-cols nf-n' + n;
             L.forEach(list => { const c = d.createElement('div'); c.className = 'nf-c'; list.forEach(k => { if (nfItems[k]) c.appendChild(nfItems[k]); }); cols.appendChild(c); });
             const old = card.querySelector(':scope > .nf-cols');
             if (old) old.replaceWith(cols);
             else { const head = card.querySelector(':scope > .flex.items-center.justify-between'); if (head) head.after(cols); else card.appendChild(cols); }
-            card.style.setProperty('--nf-w', { 1: '41rem', 2: '77.6rem' }[n]);
+            card.style.setProperty('--nf-w', { 1: '41rem', 2: '92rem' }[n]);   // v4.45: по-широк (колоните са по-широки)
             nfN = n;
         }
         // мащаб: калкулаторът да излезе възможно най-голям и да се събере целият (на телефон - по ширина, с превъртане)
@@ -7015,7 +7048,8 @@
             if (nfN !== 2) nfArrange(2);
             sec.style.zoom = '';
             const m = { w: sec.offsetWidth, h: sec.offsetHeight };
-            let z = Math.min((H - 8) / m.h, (W - 8) / m.w, 1.3);
+            const side = Math.min(140, Math.round(W * .09));   // място за „Затвори“ в ъгъла
+            let z = Math.min((H - 10) / m.h, (W - 2 * side) / m.w, 1.3);
             let scroll = false;
             if (z < .55) { z = .55; scroll = true; }   // твърде нисък прозорец: не по-дребно от 55%, а с превъртане
             z = Math.floor(z * 100) / 100;
