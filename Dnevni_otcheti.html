@@ -4558,10 +4558,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.50',
+        version: '4.51',
         date: '18.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.51', date: '18.11.2026', notes: [
+                'Калкулаторът на цял екран вече не се затваря при клик извън него - само с бутона „Затвори“ или с Esc'
+            ] },
             { version: '4.50', date: '18.11.2026', notes: [
                 'Нова визия на „Още не е преброено“ по образеца: лавандулов 3D панел, тъмна плочка с хронометъра и червено-оранжев бутон „ДОБАВИ“'
             ] },
@@ -7000,13 +7003,13 @@
             nfOv.className = 'nf-ov'; nfOv.hidden = true;
             nfOv.setAttribute('role', 'dialog'); nfOv.setAttribute('aria-modal', 'true'); nfOv.setAttribute('aria-label', 'Калкулатор Банкноти и Монети на цял екран');
             nfOv.innerHTML = '<div class="nf-bar"><span class="nf-ttl">Калкулатор Банкноти и Монети · режим на фокус</span>'
-                + '<button type="button" class="nf-close" title="Затвори (Esc или клик извън калкулатора)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span>Затвори</span></button></div>'
+                + '<button type="button" class="nf-close" title="Затвори (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span>Затвори</span></button></div>'
                 + '<iframe class="nf-frame" title="Калкулатор Банкноти и Монети" allow="clipboard-write"></iframe>'
-                + '<div class="nf-hint">Esc или клик извън калкулатора - връщане</div>';
+                + '<div class="nf-hint">Затваря се с „Затвори“ или Esc</div>';
             document.body.appendChild(nfOv);
             nfFrame = nfOv.querySelector('.nf-frame');
             nfOv.querySelector('.nf-close').addEventListener('click', nfClose);
-            nfOv.addEventListener('click', e => { if (e.target === nfOv || e.target.classList.contains('nf-bar') || e.target.classList.contains('nf-hint')) nfClose(); });
+            // v4.51: клик извън калкулатора НЕ го затваря (лесно се излизаше без да искаш) - само „Затвори“ и Esc
             nfFrame.addEventListener('load', nfOnLoad);
             nfFrame.srcdoc = nfSource();
         }
@@ -7064,9 +7067,6 @@
                 if (t && t.id === 'cmBaseAmt' && !t.readOnly) return;   // Esc там отказва промяната на стартовия баланс
                 nfClose();
             }, true);   // проверката е преди полето да приключи редакцията
-            // клик извън картата на калкулатора (по прозрачния фон) - връщане
-            // (само истински клик точно по фона - не и програмното „цъкване“ на връзката при сваляне на снимката)
-            d.addEventListener('click', e => { const t = e.target; if (e.isTrusted && (t === d.documentElement || t === d.body || t === d.getElementById('calcSection'))) nfClose(); });
             nfReady = true; nfN = 0;
             nfSyncFromMain();
             nfFit();
