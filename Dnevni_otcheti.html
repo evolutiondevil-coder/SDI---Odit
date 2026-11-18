@@ -4583,10 +4583,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.53',
+        version: '4.54',
         date: '18.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.54', date: '18.11.2026', notes: [
+                'Дневният отчет и „Наличности“ се показват веднага при отваряне - с нулеви суми, без да е нужно да се въвежда нещо'
+            ] },
             { version: '4.53', date: '18.11.2026', notes: [
                 'Нова визия на бутоните „ЦЯЛ ЕКРАН“ и „изчисти“ в калкулатора за банкноти по образеца: меки 3D хапчета в зелено и коралово; двойната стрелка се разтваря, а кръговата се завърта при посочване'
             ] },
@@ -6378,7 +6381,9 @@
 
             // 1. РЕНДЕРИРАНЕ НА ГЛАВНИЯ ОТЧЕТ ЗА СНИМКА
             const alert = document.getElementById('statusAlert');
-            if (totalResult !== 0 || absDeficit > 0) { 
+            // v4.54: отчетът и „Наличности“ се показват веднага (с нулеви суми), без да се чака въвеждане
+            const SHOW_REPORTS_ALWAYS = true;
+            if (SHOW_REPORTS_ALWAYS || totalResult !== 0 || absDeficit > 0) { 
                 const isPlus = finalResult >= 0; 
                 
                 // Автоматична смяна (Червено/Зелено) САМО ако потребителят не е избрал тема ръчно
@@ -6459,7 +6464,7 @@
 
             // 2. РЕНДЕРИРАНЕ НА ОТЧЕТА ЗА НАЛИЧНОСТИ (За дясната колона на новия блок)
             const cashAlert = document.getElementById('cashStatusAlert');
-            if (totalResult !== 0 || absDeficit > 0 || totalRealCash > 0) {
+            if (SHOW_REPORTS_ALWAYS || totalResult !== 0 || absDeficit > 0 || totalRealCash > 0) {
                 cashAlert.classList.remove('hidden');
                 cashAlert.className = "p-0 rounded-[2.5rem] overflow-hidden relative w-full h-full bg-[#f4f7f9] dark:bg-black/40 shadow-2xl border border-white/60 dark:border-white/10 transition-all duration-500 flex flex-col backdrop-blur-xl";
                 
