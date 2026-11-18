@@ -4558,10 +4558,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.51',
+        version: '4.52',
         date: '18.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.52', date: '18.11.2026', notes: [
+                'Калкулаторът на цял екран: двата бутона „ИЗЧИСТИ“ са вградени в горните ъгли на панела - коралов триъгълник (вместо ушичките)'
+            ] },
             { version: '4.51', date: '18.11.2026', notes: [
                 'Калкулаторът на цял екран вече не се затваря при клик извън него - само с бутона „Затвори“ или с Esc'
             ] },
@@ -6978,18 +6981,34 @@
             /* v4.49: заключеното поле „Стартов баланс“ - без мигащ курсор и маркиране при единичен клик (както „Общ стартов баланс“ в приложението) */
             .v3-oc:not(.is-editing) .cm-base-in { caret-color: transparent; -webkit-user-select: none; user-select: none; }
             .v3-oc:not(.is-editing) .cm-base-in::selection { background: transparent; }
-            /* v4.46: двата бутона „ИЗЧИСТИ“ са в ушички над панела - панелът и ушичките са една обща форма (SVG), без шев */
-            #calcSection > div.nf-shell { position: relative; box-shadow: none !important; background: none !important; }
-            .nf-shell.is-on { padding-top: 58px; }
-            .nf-shape { position: absolute; left: 0; top: 0; display: none; overflow: visible; pointer-events: none; z-index: 0;
-                filter: drop-shadow(0 16px 20px rgba(10,44,78,.22)) drop-shadow(0 2px 4px rgba(10,44,78,.08)); }
-            .nf-shell.is-on .nf-shape { display: block; }
-            html.nf-embed #calcSection #calculatorContainer.nf-shaped { background: none !important; border-color: transparent !important; box-shadow: none !important; }
-            .nf-tab { position: absolute; top: 0; z-index: 20; height: 58px; padding: 11px 12px 0; display: none; align-items: flex-start; justify-content: center; }
-            .nf-shell.is-on .nf-tab { display: flex; }
+            /* v4.52: двата бутона „ИЗЧИСТИ“ са вградени в горните ъгли на панела - коралов триъгълник, диагоналът е като ръб */
+            #calcSection #calculatorContainer.nf-corner { padding-top: 4.6rem; }
+            #calcSection .nf-corner .nf-head { margin-left: 1.5rem; }
+            .nf-cx { position: absolute; top: 0; z-index: 30; width: 124px; height: 124px; display: none; pointer-events: none;
+                filter: drop-shadow(0 4px 6px rgba(170,70,45,.35)); }
+            .nf-corner > .nf-cx { display: block; }
+            .nf-cx-l { left: 0; } .nf-cx-r { right: 0; }
+            .nf-cx > button { position: absolute; inset: 0; padding: 0; border: 0; cursor: pointer; pointer-events: auto; color: #fff;
+                background: linear-gradient(180deg, #f8a48d 0%, #ef8166 55%, #df6c52 100%); text-shadow: 0 1px 1px rgba(140,45,25,.45);
+                font: 800 11.5px/1 'Open Sans', 'Segoe UI', sans-serif; letter-spacing: .07em; text-transform: uppercase; white-space: nowrap;
+                transition: filter .2s ease; }
+            .nf-cx-l > button { clip-path: polygon(0 0, 100% 0, 0 100%); }
+            .nf-cx-r > button { clip-path: polygon(0 0, 100% 0, 100% 100%); }
+            .nf-cx > button::after { content: ''; position: absolute; inset: 0; pointer-events: none; }
+            .nf-cx-l > button::after { background: linear-gradient(135deg, transparent 0 calc(50% - 3px), rgba(255,255,255,.75) calc(50% - 1.5px), rgba(160,60,35,.35) 50%, transparent 50%); }
+            .nf-cx-r > button::after { background: linear-gradient(225deg, transparent 0 calc(50% - 3px), rgba(255,255,255,.75) calc(50% - 1.5px), rgba(160,60,35,.35) 50%, transparent 50%); }
+            .nf-cx > button > i { position: absolute; top: 31px; display: flex; align-items: center; gap: 5px; font-style: normal; }
+            .nf-cx-l > button > i { left: 2px; transform: rotate(-45deg); }
+            .nf-cx-r > button > i { right: 2px; transform: rotate(45deg); }
+            .nf-cx > button svg { flex: none; width: 15px; height: 15px; overflow: visible; transition: transform .7s cubic-bezier(.34,1.3,.64,1); }
+            .nf-cx > button:hover { filter: brightness(1.07) saturate(1.05); }
+            .nf-cx > button:hover svg { transform: rotate(-360deg); }
+            .nf-cx > button:active { filter: brightness(.94); }
+            .nf-cx > button:active svg { transform: rotate(-450deg) scale(.9); transition-duration: .25s; }
+            .nf-cx > button:focus-visible { outline: none; filter: brightness(1.12); }
             .nf-n2 .nf-head > .bn-clear { display: none !important; }
         `;
-        let nfOv = null, nfFrame = null, nfReady = false, nfN = 0, nfItems = null, nfHideT = 0, nfTabs = null, nfLastH = 0, nfSnap = null;
+        let nfOv = null, nfFrame = null, nfReady = false, nfN = 0, nfItems = null, nfHideT = 0, nfLastH = 0, nfSnap = null;
         function nfDoc() { try { return nfFrame && nfFrame.contentDocument; } catch (e) { return null; } }
         function nfSource() {
             const el = document.getElementById('nfCalcSrc');
@@ -7030,26 +7049,18 @@
                 + '<svg class="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/></svg>'
                 + '<svg class="i-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>';
             bnSum.querySelector('.nf-bnsum-copy').addEventListener('click', nfCopyBnSum);
-            // заглавието (логото) влиза в лявата колона; панелът се увива в „обвивка“ с обща форма и две ушички с „ИЗЧИСТИ“
+            // заглавието (логото) влиза в лявата колона; двата „ИЗЧИСТИ“ са вградени в горните ъгли на панела (v4.52)
             const head = card.querySelector(':scope > .flex.items-center.justify-between');
             if (head) head.classList.add('nf-head');
-            const shell = d.createElement('div'); shell.className = 'nf-shell';
-            card.parentNode.insertBefore(shell, card); shell.appendChild(card);
-            const svg = d.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            svg.setAttribute('class', 'nf-shape'); svg.setAttribute('aria-hidden', 'true');
-            svg.innerHTML = '<defs><linearGradient id="nfSheen" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity=".58"/><stop offset=".36" stop-color="#fff" stop-opacity=".12"/>'
-                + '<stop offset=".64" stop-color="#fff" stop-opacity=".02"/><stop offset="1" stop-color="#fff" stop-opacity=".32"/></linearGradient></defs>'
-                + '<path class="o" fill="none" stroke="rgba(20,72,110,.13)" stroke-width="2.5"/><path class="f" fill="rgba(255,255,255,.64)"/><path class="sh" fill="url(#nfSheen)"/>'
-                + '<path class="e" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="1.2"/>';
-            shell.insertBefore(svg, card);
-            const clr0 = head && head.querySelector('.bn-clear');
-            const mkTab = (side, title, fn) => {
-                const t = d.createElement('div'); t.className = 'nf-tab nf-tab-' + side;
-                const b = clr0 ? clr0.cloneNode(true) : d.createElement('button');
-                b.removeAttribute('onclick'); b.type = 'button'; b.title = title; b.setAttribute('aria-label', title);
-                b.addEventListener('click', fn); t.appendChild(b); shell.appendChild(t); return t;
+            const ICO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 3.6v4.6h4.6"/></svg>';
+            const mkCorner = (side, title, fn) => {
+                const c = d.createElement('div'); c.className = 'nf-cx nf-cx-' + side;
+                c.innerHTML = `<button type="button" title="${title}" aria-label="${title}"><i>${ICO}<span>Изчисти</span></i></button>`;
+                c.querySelector('button').addEventListener('click', fn);
+                card.appendChild(c); return c;
             };
-            nfTabs = { l: mkTab('l', 'Изчисти банкнотите (лявото поле)', nfClearLeft), r: mkTab('r', 'Изчисти търсената сума и монетите (дясното поле)', nfClearRight) };
+            mkCorner('l', 'Изчисти банкнотите (лявото поле)', nfClearLeft);
+            mkCorner('r', 'Изчисти търсената сума и монетите (дясното поле)', nfClearRight);
             if (w.ResizeObserver) new w.ResizeObserver(() => {
                 nfShape();
                 const h = card.offsetHeight;
@@ -7129,41 +7140,12 @@
             nfN = n;
             nfShape();
         }
-        // общата форма на панела и ушичките (SVG): същото стъкло и отблясък като панела, ушичките са слети с него без шев
+        // ъглите с „ИЗЧИСТИ“ се показват при 2 колони (на телефон остава общият „ИЗЧИСТИ“ в заглавието)
         function nfShape() {
-            const d = nfDoc(), card = d && d.getElementById('calculatorContainer'), shell = card && card.parentNode;
-            if (!shell || !shell.classList || !shell.classList.contains('nf-shell')) return;
-            const on = nfN === 2;
-            shell.classList.toggle('is-on', on); card.classList.toggle('nf-shaped', on);
-            if (!on || !nfTabs) return;
-            const W = card.offsetWidth, H = card.offsetHeight, TH = 58, R = 40, RT = 18, RF = 16;
-            if (!W || !H) return;
-            const cr = card.getBoundingClientRect(), k = cr.width / W || 1;
-            const cols = card.querySelectorAll(':scope > .nf-cols > .nf-c');
-            const tabs = [];
-            [['l', 0], ['r', 1]].forEach(([side, i]) => {
-                const t = nfTabs[side], c = cols[i];
-                if (!t || !c) return;
-                const tw = t.offsetWidth;
-                let x = (c.getBoundingClientRect().right - cr.left) / k - tw - 6;   // над дясната част на колоната
-                x = Math.round(Math.max(R + RF, Math.min(W - R - RF - tw, x)));
-                t.style.left = x + 'px';
-                tabs.push([x, tw]);
-            });
-            tabs.sort((a, b) => a[0] - b[0]);
-            let p = `M0 ${TH + R} A${R} ${R} 0 0 1 ${R} ${TH}`;
-            tabs.forEach(([x, tw]) => {
-                p += ` L${x - RF} ${TH} A${RF} ${RF} 0 0 0 ${x} ${TH - RF} L${x} ${RT} A${RT} ${RT} 0 0 1 ${x + RT} 0 L${x + tw - RT} 0`
-                   + ` A${RT} ${RT} 0 0 1 ${x + tw} ${RT} L${x + tw} ${TH - RF} A${RF} ${RF} 0 0 0 ${x + tw + RF} ${TH}`;
-            });
-            p += ` L${W - R} ${TH} A${R} ${R} 0 0 1 ${W} ${TH + R} L${W} ${TH + H - R} A${R} ${R} 0 0 1 ${W - R} ${TH + H} L${R} ${TH + H} A${R} ${R} 0 0 1 0 ${TH + H - R} Z`;
-            const svg = shell.querySelector(':scope > .nf-shape');
-            svg.setAttribute('width', W); svg.setAttribute('height', TH + H); svg.setAttribute('viewBox', `0 0 ${W} ${TH + H}`);
-            svg.querySelectorAll('path').forEach(e => e.setAttribute('d', p));
-            const g = svg.querySelector('#nfSheen'), q = (W + H) / 4;   // отблясъкът на панела: 135°, както в стъклото на калкулатора
-            g.setAttribute('x1', W / 2 - q); g.setAttribute('y1', TH + H / 2 - q); g.setAttribute('x2', W / 2 + q); g.setAttribute('y2', TH + H / 2 + q);
+            const d = nfDoc(), card = d && d.getElementById('calculatorContainer');
+            if (card) card.classList.toggle('nf-corner', nfN === 2);
         }
-        // „ИЗЧИСТИ“ в ушичките: лявата - само банкнотите; дясната - търсената сума и монетите (махнатите каси си остават махнати)
+        // „ИЗЧИСТИ“ в ъглите: левият - само банкнотите; десният - търсената сума и монетите (махнатите каси си остават махнати)
         function nfClearLeft() {
             const d = nfDoc(), w = nfFrame && nfFrame.contentWindow;
             if (!d || !w) return;
