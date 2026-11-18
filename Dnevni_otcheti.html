@@ -4558,10 +4558,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.48',
-        date: '17.11.2026',
+        version: '4.49',
+        date: '18.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.49', date: '18.11.2026', notes: [
+                'Калкулаторът на цял екран: при единичен клик в „Стартов баланс“ вече не се показва мигащ курсор - той излиза само когато полето е отключено с двоен клик'
+            ] },
             { version: '4.48', date: '17.11.2026', notes: [
                 'Калкулаторът на цял екран: бутонът „Свали всичко“ е по-малък'
             ] },
@@ -6966,6 +6969,9 @@
             .nf-bnsum-copy.is-done .i-ok { opacity: 1; transform: none; }
             /* v4.48: по-малък бутон „Свали всичко“ (колкото „Сбор банкноти“) - надписът се смалява заедно с него */
             .nf-cols .cm-dl .dl-btn.dl-glass { max-width: 16rem; }
+            /* v4.49: заключеното поле „Стартов баланс“ - без мигащ курсор и маркиране при единичен клик (както „Общ стартов баланс“ в приложението) */
+            .v3-oc:not(.is-editing) .cm-base-in { caret-color: transparent; -webkit-user-select: none; user-select: none; }
+            .v3-oc:not(.is-editing) .cm-base-in::selection { background: transparent; }
             /* v4.46: двата бутона „ИЗЧИСТИ“ са в ушички над панела - панелът и ушичките са една обща форма (SVG), без шев */
             #calcSection > div.nf-shell { position: relative; box-shadow: none !important; background: none !important; }
             .nf-shell.is-on { padding-top: 58px; }
