@@ -4677,10 +4677,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.71',
+        version: '4.72',
         date: '26.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.72', date: '26.11.2026', notes: [
+                'Текстовете са за евро: „до цента“ вместо „до стотинката“ и „50, 20, 10 цента“ вместо „ст.“ (броячът и лентата за преброяване)'
+            ] },
             { version: '4.71', date: '26.11.2026', notes: [
                 'Броячът на отчетените пари: монетите от 2 € и 1 € са по-големи; при посочване се завъртат, без да излизат от полето си'
             ] },
@@ -4693,13 +4696,13 @@
             ] },
             { version: '4.68', date: '26.11.2026', notes: [
                 'Броячът на отчетените пари: монети от 2 € и 1 € с истинските им снимки, със стрелки за добавяне и намаляне',
-                'Полето за останалите монети е „Други монети“ (остатък - 50, 20, 10 ст. и др.) и се попълва като сума, както досега'
+                'Полето за останалите монети е „Други монети“ (остатък - 50, 20, 10 цента и др.) и се попълва като сума, както досега'
             ] },
             { version: '4.67', date: '25.11.2026', notes: [
                 'Лентата „Преброяване на „Отчетени пари““: проблясъкът минава на всеки 3 секунди и още веднъж веднага, когато мишката влезе в лентата'
             ] },
             { version: '4.66', date: '25.11.2026', notes: [
-                'Отчетът: „Преброяване на „Отчетени пари““ е широка светлозелена лента през цялата карта, точно над „Налични физически“ - с логото, подзаглавие „провери плика до стотинката“ и стрелка (вместо малкия бутон под сумата)'
+                'Отчетът: „Преброяване на „Отчетени пари““ е широка светлозелена лента през цялата карта, точно над „Налични физически“ - с логото, подзаглавие „провери плика до цента“ и стрелка (вместо малкия бутон под сумата)'
             ] },
             { version: '4.65', date: '22.11.2026', notes: [
                 'Калкулатор банкноти (и на цял екран): редовете с банкноти са малко по-високи - банкнотата не излиза от полето, когато се увеличи'
@@ -6595,9 +6598,9 @@
                                 ${absDeficit > 0 && totalResult !== 0 ? `<div class="rq-calc" id="reportCalc"><span>Оборот<b>${totalResult < 0 ? '− ' : ''}${formatCurrencySmall(Math.abs(totalResult))}</b></span><i>−</i><span class="rq-neg">Минус от предходен ден<b>${formatCurrencySmall(absDeficit)}</b></span></div>` : ''}
                             </div>
                             ${deficitHtml}
-                            ${finalResult > 0 ? `<button type="button" class="rq-cstrip" data-html2canvas-ignore data-target="${finalResult.toFixed(2)}" data-cash="${(+expected || 0).toFixed(2)}" onclick="rcOpen(this)" title="Отделен брояч за отчетените пари" aria-label="Преброяване на отчетените пари - провери плика до стотинката">`
+                            ${finalResult > 0 ? `<button type="button" class="rq-cstrip" data-html2canvas-ignore data-target="${finalResult.toFixed(2)}" data-cash="${(+expected || 0).toFixed(2)}" onclick="rcOpen(this)" title="Отделен брояч за отчетените пари" aria-label="Преброяване на отчетените пари - провери плика до цента">`
                                 + `<img class="rq-cs-logo" src="${RC_LOGO_IMG}" alt="" aria-hidden="true" draggable="false">`
-                                + `<span class="rq-cs-txt"><b>Преброяване на „Отчетени пари“</b><small>провери плика до стотинката</small></span>`
+                                + `<span class="rq-cs-txt"><b>Преброяване на „Отчетени пари“</b><small>провери плика до цента</small></span>`
                                 + `<span class="rq-cs-go" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 6l6 6-6 6"/></svg></span></button>` : ''}
                             <div id="footerBox" class="rq-foot">
                                 <span class="rq-fl"><span class="rq-chip rq-chip-3d"><img class="rq-bill-3d" src="${RQ_BILL_IMG}" width="113" height="72" alt="" aria-hidden="true" draggable="false"></span><span>Налични физически</span></span>
@@ -9059,7 +9062,7 @@
                 <div class="rc-lbl">Банкноти</div>
                 <div class="rc-bn">${rows}
                     <div class="rc-lbl rc-lbl-in">Монети</div>${coinRows}
-                    <label class="rc-r rc-coin"><span class="rc-cimg"><img src="${RQ_COIN_IMG}" alt="" aria-hidden="true" draggable="false"></span><span class="lbl">Други монети<small>остатък – 50, 20, 10 ст. и др.</small></span>
+                    <label class="rc-r rc-coin"><span class="rc-cimg"><img src="${RQ_COIN_IMG}" alt="" aria-hidden="true" draggable="false"></span><span class="lbl">Други монети<small>остатък – 50, 20, 10 цента и др.</small></span>
                         <input class="rc-n" id="rcCoins" type="text" inputmode="decimal" autocomplete="off" placeholder="0,00" aria-label="Други монети - обща сума"><span class="eur">€</span></label>
                 </div>
                 <div class="rc-sum"><div>Преброено<b id="rcCounted">0,00 €</b></div><div>Търсена<b id="rcTarget2">0,00 €</b></div></div>
