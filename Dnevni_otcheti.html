@@ -2006,7 +2006,7 @@
         .rq-cstrip:active .rq-cs-go { transform: scale(.92); }
         .is-export .rq-cstrip { display: none !important; }
         @media (max-width: 640px) { .rq-cstrip { gap: .7rem; padding: .75rem 1rem; } .rq-cs-logo { width: 2.7rem; height: 2.7rem; } .rq-cs-txt b { font-size: .78rem; letter-spacing: .04em; } .rq-cs-txt small { font-size: .72rem; } .rq-cs-go { width: 2.2rem; height: 2.2rem; } }
-        @media (max-width: 520px) { .rc-note { height: 2rem; } .rc-coinpic { width: 4.63rem; } .rc-coinpic img { width: 2.5rem; height: 2.5rem; } }
+        @media (max-width: 520px) { .rc-note { height: 2rem; } .rc-coinpic { width: 4.63rem; } .rc-coinpic img { width: 2.95rem; height: 2.95rem; } }
 
         /* v4.60: брояч на отчетените пари - отделен прозорец в средата, фонът е замъглен; не пипа калкулатора за банкноти */
         html.rc-open, html.rc-open body { overflow: hidden; }
@@ -2070,9 +2070,9 @@
         /* v4.68: монети 2 € и 1 € - снимките са центрирани на мястото на банкнотите, за да са подравнени полетата */
         .rc-lbl-in { grid-column: 1 / -1; margin: .35rem 0 -.05rem .2rem; }
         .rc-coinpic { flex: none; width: 5.32rem; display: grid; place-items: center; margin: 0 .1rem 0 .15rem; }
-        .rc-coinpic img { display: block; width: 2.85rem; height: 2.85rem; border-radius: 50%; user-select: none;
+        .rc-coinpic img { display: block; width: 3.35rem; height: 3.35rem; border-radius: 50%; user-select: none;
             filter: drop-shadow(0 3px 4px rgba(0,0,0,.28)); transition: transform .45s cubic-bezier(.34,1.5,.64,1), filter .3s ease; }
-        .rc-coinpic img:hover { transform: translateY(-2px) scale(1.12) rotate(-12deg); filter: drop-shadow(0 7px 8px rgba(0,0,0,.32)); }
+        .rc-coinpic img:hover { transform: translateY(-1px) scale(1.06) rotate(-14deg); filter: drop-shadow(0 6px 7px rgba(0,0,0,.32)); }   /* v4.71: по-голяма монета, по-малко уголемяване - остава в полето */
         .rc-coin .rc-n { width: 7rem; margin-left: auto; text-align: right; padding: 0 .7rem; }
         .rc-coin .eur { font-weight: 800; color: var(--rc-mut); }
         .rc-sum { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem; margin: .8rem 0 .7rem; }
@@ -4677,10 +4677,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.70',
+        version: '4.71',
         date: '26.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.71', date: '26.11.2026', notes: [
+                'Броячът на отчетените пари: монетите от 2 € и 1 € са по-големи; при посочване се завъртат, без да излизат от полето си'
+            ] },
             { version: '4.70', date: '26.11.2026', notes: [
                 'Броячът на отчетените пари е по-широк и се нагажда към екрана: става по-голям, колкото позволява мониторът, и винаги се събира наведнъж',
                 'Калкулаторът на цял екран на голям монитор може да стане по-голям (до 160% вместо до 130%)'
