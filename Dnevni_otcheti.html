@@ -4676,10 +4676,13 @@
     // 1.x - първата версия (Gemini 3.1 Pro), 2.x - първите подобрения с Claude, 3.x - новата визия;
     // второто число е поредното обновяване в текущата линия.
     window.APP_INFO = {
-        version: '4.68',
+        version: '4.69',
         date: '26.11.2026',
         // История по версии - най-новата е първа. При обновяване: вдигни version/date и добави нов запис най-отгоре.
         history: [
+            { version: '4.69', date: '26.11.2026', notes: [
+                'Калкулаторът на цял екран: „Сбор банкноти“ показва веднага сбора на въведените банкноти (преди показваше 0 €, докато не се промени число)'
+            ] },
             { version: '4.68', date: '26.11.2026', notes: [
                 'Броячът на отчетените пари: монети от 2 € и 1 € с истинските им снимки, със стрелки за добавяне и намаляне',
                 'Полето за останалите монети е „Други монети“ (остатък - 50, 20, 10 ст. и др.) и се попълва като сума, както досега'
@@ -7268,6 +7271,7 @@
             nfReady = true; nfN = 0;
             nfSyncFromMain();
             nfFit();
+            nfBnSumUpdate();
         }
         // копиране на сбора на банкнотите - цяло число, както го приема приложението (напр. 1460)
         function nfBnSumTotal() {
@@ -7289,7 +7293,8 @@
             if (nav && nav.clipboard && w.isSecureContext) nav.clipboard.writeText(val).then(ok, legacy); else legacy();
         }
         function nfBnSumUpdate() {
-            const d = nfDoc(), el = d && d.getElementById('nfBnSumVal');
+            // v4.69: полето може още да не е подредено в страницата при първото отваряне - търси се и в самото него
+            const d = nfDoc(), el = (d && d.getElementById('nfBnSumVal')) || (nfItems && nfItems.bnsum && nfItems.bnsum.querySelector('#nfBnSumVal'));
             if (!el) return;
             const t = NF_DENOMS.reduce((a, n) => { const i = d.getElementById('bnCount' + n); return a + (i ? (parseInt(i.value) || 0) * n : 0); }, 0);
             el.innerHTML = String(t) + '<span>€</span>';
@@ -7386,7 +7391,7 @@
             nfOv.hidden = false;
             document.documentElement.classList.add('nf-open');
             requestAnimationFrame(() => nfOv.classList.add('is-on'));
-            if (nfReady) { nfSyncFromMain(); nfFit(); }
+            if (nfReady) { nfSyncFromMain(); nfFit(); nfBnSumUpdate(); }
             nfSnap = NF_DENOMS.map(n => (document.getElementById('bnCount' + n) || {}).value || '');   // за проблясването след затваряне
             const c = nfOv.querySelector('.nf-close'); if (c) c.focus({ preventScroll: true });
         }
